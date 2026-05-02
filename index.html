@@ -60,8 +60,8 @@
         <label>회원명<input name="name" required placeholder="예: 김민수"></label>
         <label>날짜<input type="date" name="date" required></label>
         <label>시작 시간<input type="time" name="start" required></label>
-        <label>소요(분)<input type="number" name="duration" value="60" min="10" step="5" required></label>
-        <button type="submit">캘린더에 등록</button>
+        <label>소요(분)<input type="number" name="duration" value="50" min="10" step="5" required></label>
+        <button type="submit">미리보기에 추가</button>
       </form>
     </div>
 
@@ -86,8 +86,8 @@
     </div>
 
     <div id="preview" class="preview hidden">
-      <h3>미리보기</h3>
-      <p class="hint">행을 직접 수정할 수 있습니다. 잘못된 행은 삭제 버튼으로 제거하세요.</p>
+      <h3>미리보기 <span id="preview-count" class="hint"></span></h3>
+      <p class="hint">행을 직접 수정할 수 있습니다. 잘못된 행은 삭제 버튼으로 제거하세요. 모두 입력했으면 아래 <b>확정</b> 버튼을 누르면 캘린더로 이동합니다.</p>
       <div class="preview-table-wrap">
         <table id="preview-table"></table>
       </div>

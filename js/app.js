@@ -40,7 +40,7 @@ $$('.tabs button').forEach(b => {
   });
 });
 
-// ---------- typing form ----------
+// ---------- typing form: accumulate into preview, commit via 확정 ----------
 $('#form-typing').addEventListener('submit', (e) => {
   e.preventDefault();
   const fd = new FormData(e.target);
@@ -48,13 +48,14 @@ $('#form-typing').addEventListener('submit', (e) => {
     name: String(fd.get('name')).trim(),
     date: fd.get('date'),
     startTime: fd.get('start'),
-    durationMin: parseInt(fd.get('duration'), 10) || 60
+    durationMin: parseInt(fd.get('duration'), 10) || 50
   };
   if (!session.name || !session.date || !session.startTime) return;
-  commitSessions([session]);
-  e.target.reset();
-  flash('등록되었습니다.');
-  switchView('calendar');
+  appendToPreview([session]);
+  flash('미리보기에 추가되었습니다. 모두 입력 후 확정을 누르세요.');
+  // Reset name only — keep date/duration for fast multi-entry
+  e.target.elements.name.value = '';
+  e.target.elements.name.focus();
 });
 
 // ---------- file inputs ----------
@@ -103,8 +104,17 @@ function showPreview({ sessions, warnings }) {
   $('#preview').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+function appendToPreview(sessions) {
+  if (!Array.isArray(state.pending)) state.pending = [];
+  state.pending.push(...sessions.map(s => ({ ...s })));
+  renderPreviewTable([]);
+  $('#preview').classList.remove('hidden');
+}
+
 function renderPreviewTable(warnings) {
   const tbl = $('#preview-table');
+  const cnt = $('#preview-count');
+  if (cnt) cnt.textContent = `(${(state.pending || []).length}건)`;
   let html = '<thead><tr><th>회원</th><th>날짜</th><th>시작</th><th>분</th><th></th></tr></thead><tbody>';
   state.pending.forEach((s, i) => {
     html += `<tr data-idx="${i}">
@@ -287,8 +297,9 @@ function renderCalendar() {
   let sessions = Store.sessions();
   if (state.filter) sessions = sessions.filter(s => s.memberId === state.filter);
   const members = Store.members();
+  const fit = !!state.filter;
   const label = state.mode === 'week'
-    ? renderWeek(cont, state.anchor, sessions, members)
+    ? renderWeek(cont, state.anchor, sessions, members, fit)
     : renderMonth(cont, state.anchor, sessions, members);
   $('#period-label').textContent = label;
 }
@@ -314,6 +325,20 @@ function flash(msg) {
 }
 
 // ---------- init ----------
+function pinToday() {
+  // Lock typing form date to current real date on load
+  const dateInput = $('#form-typing input[name="date"]');
+  if (dateInput && !dateInput.value) dateInput.value = ymd(new Date());
+  // Anchor calendar to today (real-time)
+  state.anchor = new Date();
+}
+
+pinToday();
 refreshFilter();
 renderCalendar();
 renderMembers();
+
+// Refresh week view every minute so the red "now" line tracks current time.
+setInterval(() => {
+  if (state.view === 'calendar' && state.mode === 'week') renderCalendar();
+}, 60_000);

@@ -51,10 +51,36 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px; }
 
 /* Week view */
 .week-grid {
+  position: relative;
   display: grid;
   grid-template-columns: 60px repeat(7, 1fr);
   gap: 1px; background: #e5e7eb;
   border-radius: 6px; overflow: hidden;
+}
+.week-grid .period-divider {
+  grid-column: 1 / -1;
+  background: #f3f4f6;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #4b5563;
+  letter-spacing: 0.5px;
+}
+.now-line {
+  position: absolute;
+  right: 0;
+  height: 2px;
+  background: #ef4444;
+  z-index: 5;
+  pointer-events: none;
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.4);
+}
+.now-dot {
+  position: absolute;
+  left: -5px; top: -4px;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
 }
 .week-grid .head {
   background: #fafafa; font-weight: 600;

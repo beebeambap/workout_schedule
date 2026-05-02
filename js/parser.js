@@ -63,7 +63,7 @@ function rowsToSessions(rows) {
       const et = parseTime(endRaw);
       if (et) duration = (et[0] * 60 + et[1]) - (st[0] * 60 + st[1]);
     }
-    if (!Number.isFinite(duration) || duration <= 0) duration = 60;
+    if (!Number.isFinite(duration) || duration <= 0) duration = 50;
 
     sessions.push({
       name,
@@ -124,7 +124,7 @@ export function parseFreeText(text) {
         name: m[1],
         date: currentDate,
         startTime: pad(h) + ':' + pad(mi),
-        durationMin: 60
+        durationMin: 50
       });
     }
   }
