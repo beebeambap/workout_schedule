@@ -124,6 +124,40 @@ window.SUPABASE_ANON_KEY = 'eyJhbGciOi...';
 2. 받은 메일의 링크 클릭 → 자동으로 페이지로 돌아오며 로그인 완료.
 3. 처음 로그인 시 브라우저에 남아있던 로컬 데이터가 있으면 클라우드로 이전할지 물어봅니다.
 
+## 6.5 추가 마이그레이션 (트레이너 자기 일정 + 회원 상태)
+
+이미 초기 설정을 마쳤다면, **추가 기능**(내 일정 추가 / PT 연장·종료 통계) 활성화를 위해 다음 SQL을 한 번 더 실행하세요. 기존 데이터에 영향 없이 컬럼만 추가합니다.
+
+```sql
+-- sessions: 트레이너 자기 일정용으로 member_id 를 nullable + title 컬럼
+alter table public.sessions alter column member_id drop not null;
+alter table public.sessions add column if not exists title text;
+
+-- 트리거: member_id 가 null 이면 검증 건너뛰도록 갱신
+create or replace function public.session_owner_check()
+returns trigger language plpgsql as $$
+begin
+  if new.member_id is null then
+    return new;
+  end if;
+  if not exists (
+    select 1 from public.members
+     where id = new.member_id and trainer_id = new.trainer_id
+  ) then
+    raise exception 'member_id does not belong to trainer';
+  end if;
+  return new;
+end;
+$$;
+
+-- members: 상태 추적
+alter table public.members
+  add column if not exists status text not null default 'active',
+  add column if not exists status_at date not null default current_date;
+```
+
+이 SQL을 실행하지 않아도 기본 캘린더/회원 관리 기능은 그대로 동작합니다. "내 일정 추가"와 통계의 PT 연장/종료 항목은 마이그레이션 후 활성화됩니다.
+
 ## 7. 동작 검증
 
 - 캘린더에서 수업 추가 → 다른 기기에서 같은 계정으로 로그인하면 자동 반영.

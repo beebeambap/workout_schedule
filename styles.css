@@ -1,11 +1,16 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
+html, body { height: 100%; }
 body {
   margin: 0;
   font-family: 'Noto Sans KR', system-ui, sans-serif;
   color: #111827;
   background: #f6f7f9;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
+main { flex: 1 0 auto; }
 
 .topbar {
   display: flex;
@@ -613,10 +618,11 @@ textarea.ocr-text {
   .md-calendar { max-height: 50vh; }
 }
 
-/* ---------- Footer ---------- */
+/* ---------- Footer (sticky bottom) ---------- */
 .site-footer {
-  margin-top: 40px;
-  padding: 16px 20px;
+  flex-shrink: 0;
+  margin-top: auto;
+  padding: 14px 20px;
   border-top: 1px solid #e5e7eb;
   font-size: 12px;
   color: #6b7280;
@@ -624,6 +630,84 @@ textarea.ocr-text {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 8px;
-  background: #fafafa;
+  background: #ffffff;
 }
-.site-footer .watermark { font-weight: 600; color: #4b5563; letter-spacing: 0.3px; }
+.site-footer .watermark { font-weight: 700; color: #374151; letter-spacing: 0.4px; }
+
+/* ---------- Day-of-week colors + holiday markers ---------- */
+.wg-day-head.dow-sat { color: #2563eb; }
+.wg-day-head.dow-sun { color: #dc2626; }
+.wg-day-head.is-holiday { color: #dc2626; }
+.wg-day-head .wg-holiday-name {
+  display: block; font-size: 10px; font-weight: 500;
+  color: #dc2626; margin-top: 2px;
+}
+.month-grid .day.dow-sat .day-num { color: #2563eb; }
+.month-grid .day.dow-sun .day-num { color: #dc2626; }
+.month-grid .day.is-holiday .day-num { color: #dc2626; }
+.month-grid .day .day-holiday {
+  font-size: 10px; color: #dc2626; font-weight: 600;
+  margin-top: 2px; line-height: 1.1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ---------- Personal (trainer self) events ---------- */
+.wg-event-personal {
+  border: 1px dashed rgba(255,255,255,0.6);
+  background-image: repeating-linear-gradient(
+    45deg, rgba(255,255,255,0.0), rgba(255,255,255,0.0) 6px,
+    rgba(255,255,255,0.12) 6px, rgba(255,255,255,0.12) 12px
+  ) !important;
+}
+.month-grid .ev.ev-personal {
+  border: 1px dashed rgba(255,255,255,0.6);
+}
+
+/* ---------- Polish: topbar + cards + buttons ---------- */
+.topbar {
+  backdrop-filter: saturate(180%) blur(8px);
+  background: rgba(255, 255, 255, 0.92);
+}
+.topbar h1 {
+  font-size: 17px; font-weight: 800; letter-spacing: -0.3px;
+}
+.topbar h1::before {
+  content: '●'; color: #ef4444; font-size: 10px;
+  margin-right: 8px; vertical-align: middle;
+}
+.topbar nav button {
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.calendar-canvas {
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+#btn-add-personal {
+  background: #fff; color: #2563eb;
+  border-color: #bfdbfe;
+}
+#btn-add-personal:hover { background: #eff6ff; }
+#btn-export, #btn-export-all, #btn-stats-xlsx {
+  background: #111827; color: #fff; border-color: #111827;
+}
+#btn-export:hover, #btn-export-all:hover, #btn-stats-xlsx:hover {
+  background: #1f2937;
+}
+
+.member-card {
+  position: relative;
+  overflow: hidden;
+}
+.member-card::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 4px; background: var(--accent, #e5e7eb);
+}
+
+#mm-status {
+  padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px;
+  font: inherit; background: #fff;
+}

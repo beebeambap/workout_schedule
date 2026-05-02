@@ -23,14 +23,14 @@ const _locks = new Map();
 async function inProcessLock(name, _timeout, fn) {
   const prev = _locks.get(name) || Promise.resolve();
   let release;
-  const next = new Promise((r) => { release = r; });
-  _locks.set(name, prev.then(() => next));
-  await prev;
+  const slot = new Promise((r) => { release = r; });
+  // Tail of chain ignores prior failures so one rejection doesn't break the chain.
+  _locks.set(name, prev.catch(() => {}).then(() => slot));
   try {
+    await prev.catch(() => {});
     return await fn();
   } finally {
     release();
-    if (_locks.get(name) === prev.then(() => next)) _locks.delete(name);
   }
 }
 

@@ -11,6 +11,7 @@
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 </head>
@@ -71,8 +72,9 @@
         <select id="member-filter" title="회원 필터">
           <option value="">전체 회원</option>
         </select>
+        <button id="btn-add-personal" title="트레이너 본인 일정 추가">+ 내 일정</button>
         <button id="btn-export">JPG 저장</button>
-        <button id="btn-export-all" title="모든 회원을 개별 JPG로 저장">회원별 일괄</button>
+        <button id="btn-export-all" title="모든 회원을 ZIP으로 저장">회원별 일괄(ZIP)</button>
         <button id="btn-stats-xlsx" title="월별 통계 엑셀">통계 XLSX</button>
       </div>
     </div>
@@ -178,6 +180,13 @@
     <h3>회원 정보</h3>
     <div class="modal-body">
       <label>이름<input id="mm-name" type="text" required></label>
+      <label>상태
+        <select id="mm-status">
+          <option value="active">활성</option>
+          <option value="extended">PT 연장</option>
+          <option value="ended">PT 종료</option>
+        </select>
+      </label>
       <div class="form-color">
         <span class="form-color-label">색상</span>
         <div class="color-palette" data-target="mm-color"></div>
@@ -226,6 +235,23 @@
           <button type="button" id="md-edit">정보 편집</button>
         </div>
       </aside>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="modal-personal" class="modal">
+  <div class="modal-content">
+    <button class="modal-close" data-close aria-label="닫기">&times;</button>
+    <h3>내 일정 추가</h3>
+    <div class="modal-body">
+      <label>제목<input id="pe-title" type="text" placeholder="예: 점심 약속"></label>
+      <label>날짜<input id="pe-date" type="date" required></label>
+      <label>시작 시간<input id="pe-start" type="time" required></label>
+      <label>소요(분)<input id="pe-duration" type="number" min="10" step="5" value="60"></label>
+    </div>
+    <div class="modal-actions">
+      <button type="button" id="pe-save" class="primary">저장</button>
+      <button type="button" data-close>취소</button>
     </div>
   </div>
 </dialog>

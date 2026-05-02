@@ -47,7 +47,8 @@ function buildWeekSummary(start, sessions) {
   return html;
 }
 
-export async function exportSchedule({ member, anchor, mode, sessions, members, filename }) {
+// Build the export DOM, capture to canvas, return a JPG Blob.
+export async function exportScheduleBlob({ member, anchor, mode, sessions, members }) {
   const filtered = member ? sessions.filter(s => s.memberId === member.id) : sessions;
   const title = member ? `${member.name}님 PT 스케줄` : '전체 PT 스케줄';
 
@@ -72,15 +73,11 @@ export async function exportSchedule({ member, anchor, mode, sessions, members, 
   const calContainer = node.querySelector('.export-calendar');
   if (mode === 'week') {
     renderWeek(calContainer, anchor, filtered, members, !!member, {
-      hideMemberName: !!member,
-      exportMode: true,
+      hideMemberName: !!member, exportMode: true,
     });
   } else {
-    renderMonth(calContainer, anchor, filtered, members, {
-      hideMemberName: !!member,
-    });
+    renderMonth(calContainer, anchor, filtered, members, { hideMemberName: !!member });
   }
-
   if (member && mode === 'week') {
     node.insertAdjacentHTML('beforeend', buildWeekSummary(startOfWeek(anchor), filtered));
   }
@@ -89,20 +86,24 @@ export async function exportSchedule({ member, anchor, mode, sessions, members, 
   try {
     if (document.fonts && document.fonts.ready) await document.fonts.ready;
     await new Promise(r => requestAnimationFrame(r));
-
     const canvas = await html2canvas(node, {
-      backgroundColor: '#ffffff',
-      scale: 2,
-      useCORS: true,
+      backgroundColor: '#ffffff', scale: 2, useCORS: true,
     });
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.92));
+    return blob;
   } finally {
     node.remove();
   }
+}
+
+export async function exportSchedule(opts) {
+  const blob = await exportScheduleBlob(opts);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = opts.filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }

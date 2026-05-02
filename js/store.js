@@ -24,13 +24,16 @@ function rowToMember(r) {
     name: r.name,
     color: r.color,
     memo: r.memo || '',
+    status: r.status || 'active',
+    statusAt: r.status_at || null,
   };
 }
 
 function rowToSession(r) {
   return {
     id: r.id,
-    memberId: r.member_id,
+    memberId: r.member_id || null,
+    title: r.title || null,
     date: r.date,
     startTime: typeof r.start_time === 'string' ? r.start_time.slice(0, 5) : r.start_time,
     durationMin: r.duration_min,
@@ -121,6 +124,14 @@ export const Store = {
     }
     if (patch.color != null) update.color = patch.color;
     if (patch.memo != null) update.memo = String(patch.memo);
+    if (patch.status != null) {
+      update.status = patch.status;
+      if (patch.status !== cur.status) {
+        // record status change date
+        const today = new Date();
+        update.status_at = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+      }
+    }
     const { data, error } = await sb.from('members').update(update).eq('id', id).select().single();
     if (error) throw error;
     const m = rowToMember(data);
@@ -139,12 +150,16 @@ export const Store = {
 
   async addSessions(arr) {
     if (!arr.length) return [];
-    const rows = arr.map(s => ({
-      member_id: s.memberId,
-      date: s.date,
-      start_time: s.startTime,
-      duration_min: s.durationMin,
-    }));
+    const rows = arr.map(s => {
+      const row = {
+        member_id: s.memberId || null,
+        date: s.date,
+        start_time: s.startTime,
+        duration_min: s.durationMin,
+      };
+      if (s.title) row.title = s.title;
+      return row;
+    });
     const { data, error } = await sb.from('sessions').insert(rows).select();
     if (error) throw error;
     const inserted = data.map(rowToSession);

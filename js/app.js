@@ -1,9 +1,10 @@
 import { Store } from './store.js';
 import { parseCSV, parseXLSX, parseFreeText } from './parser.js';
 import { renderWeek, renderMonth, computeEndTime } from './calendar.js';
-import { exportSchedule } from './exporter.js';
+import { exportSchedule, exportScheduleBlob } from './exporter.js';
 import { sbReady, status as sbStatus } from './supabase.js';
 import { getSession, sendMagicLink, signOut, onAuthChange, updateUserMetadata } from './auth.js';
+import { preloadHolidays, ensureYearLoaded } from './holidays.js';
 
 const COLOR_PALETTE = ['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#06b6d4'];
 
@@ -178,11 +179,18 @@ function renderPreviewTable(warnings) {
   });
 }
 
+let confirmBusy = false;
 $('#btn-confirm').addEventListener('click', async () => {
+  if (confirmBusy) return;
   if (!state.pending || !state.pending.length) {
-    alert('확정할 항목이 없습니다.');
+    alert('확정할 항목이 없습니다. 먼저 텍스트/CSV/타이핑으로 미리보기에 행을 추가하세요.');
     return;
   }
+  const btn = $('#btn-confirm');
+  confirmBusy = true;
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = '저장 중...';
   try {
     await commitSessions(state.pending);
     state.pending = null;
@@ -190,7 +198,13 @@ $('#btn-confirm').addEventListener('click', async () => {
     flash('확정되었습니다.');
     switchView('calendar');
   } catch (err) {
-    alert('저장 오류: ' + err.message);
+    console.error('[confirm] error:', err);
+    alert('저장 오류: ' + (err?.message || err) +
+      '\n\n브라우저 개발자 도구(F12)의 Console 탭에 자세한 내용이 있습니다.');
+  } finally {
+    confirmBusy = false;
+    btn.disabled = false;
+    btn.textContent = orig;
   }
 });
 
@@ -310,22 +324,47 @@ $('#btn-export').addEventListener('click', async () => {
 $('#btn-export-all').addEventListener('click', async () => {
   const ms = Store.members();
   if (!ms.length) { alert('회원이 없습니다.'); return; }
-  if (!confirm(`${ms.length}명의 회원 캘린더를 각각 JPG로 저장합니다. 브라우저가 다중 다운로드를 묻거나 차단할 수 있습니다. 계속할까요?`)) return;
+  if (!confirm(`${ms.length}명의 회원 캘린더를 ZIP 한 파일로 묶어 다운로드합니다. 계속할까요?`)) return;
+  const btn = $('#btn-export-all');
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '생성 중...';
 
-  const sessions = Store.sessions();
-  const members = Store.members();
-  for (const m of ms) {
-    await exportSchedule({
-      member: m,
-      anchor: state.anchor,
-      mode: state.mode,
-      sessions,
-      members,
-      filename: `${m.name}_${ymd(state.anchor)}_${state.mode}.jpg`,
-    });
-    await new Promise(r => setTimeout(r, 250));
+  try {
+    const sessions = Store.sessions();
+    const members = Store.members();
+    const zip = new JSZip();
+    let i = 0;
+    for (const m of ms) {
+      i++;
+      btn.textContent = `생성 중 ${i}/${ms.length}`;
+      const blob = await exportScheduleBlob({
+        member: m,
+        anchor: state.anchor,
+        mode: state.mode,
+        sessions,
+        members,
+      });
+      zip.file(`${m.name}_${ymd(state.anchor)}_${state.mode}.jpg`, blob);
+    }
+    btn.textContent = '압축 중...';
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pt_schedules_${ymd(state.anchor)}_${state.mode}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    flash('ZIP 다운로드 완료');
+  } catch (err) {
+    console.error(err);
+    alert('ZIP 생성 오류: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
   }
-  flash('일괄 저장 완료');
 });
 
 function refreshFilter() {
@@ -338,6 +377,7 @@ function refreshFilter() {
   state.filter = sel.value;
 }
 
+let _renderingForYear = null;
 function renderCalendar() {
   const cont = $('#calendar');
   let sessions = Store.sessions();
@@ -348,7 +388,59 @@ function renderCalendar() {
     ? renderWeek(cont, state.anchor, sessions, members, fit)
     : renderMonth(cont, state.anchor, sessions, members);
   $('#period-label').textContent = label;
+  // If holidays for this year aren't loaded yet, load and re-render once.
+  const y = state.anchor.getFullYear();
+  if (_renderingForYear !== y) {
+    _renderingForYear = y;
+    ensureYearLoaded(y).then(() => {
+      if (state.view === 'calendar' && state.anchor.getFullYear() === y) {
+        const cont2 = $('#calendar');
+        if (state.mode === 'week') renderWeek(cont2, state.anchor, sessions, members, fit);
+        else renderMonth(cont2, state.anchor, sessions, members);
+      }
+    });
+  }
 }
+
+// ---------- trainer's personal events ----------
+$('#btn-add-personal').addEventListener('click', () => {
+  $('#pe-title').value = '';
+  $('#pe-date').value = ymd(state.anchor || new Date());
+  $('#pe-start').value = '';
+  $('#pe-duration').value = 60;
+  $('#modal-personal').showModal();
+  setTimeout(() => $('#pe-title').focus(), 50);
+});
+
+let peSaveBusy = false;
+$('#pe-save').addEventListener('click', async () => {
+  if (peSaveBusy) return;
+  const title = $('#pe-title').value.trim();
+  const date = $('#pe-date').value;
+  const start = $('#pe-start').value;
+  const duration = parseInt($('#pe-duration').value, 10);
+  if (!date || !start) { alert('날짜와 시작 시간을 입력하세요.'); return; }
+  peSaveBusy = true;
+  const btn = $('#pe-save'); btn.disabled = true;
+  try {
+    await Store.addSessions([{
+      memberId: null,
+      title: title || '내 일정',
+      date,
+      startTime: start,
+      durationMin: Number.isFinite(duration) ? duration : 60,
+    }]);
+    $('#modal-personal').close();
+    flash('일정이 추가되었습니다.');
+  } catch (err) {
+    console.error(err);
+    alert('저장 오류: ' + (err?.message || err) +
+      '\n\nSupabase 스키마 마이그레이션이 필요할 수 있습니다. docs/SUPABASE_SETUP.md 참고.');
+  } finally {
+    peSaveBusy = false;
+    btn.disabled = false;
+  }
+});
 
 // ---------- click on a calendar event opens session modal ----------
 $('#calendar').addEventListener('click', (ev) => {
@@ -361,36 +453,47 @@ $('#calendar').addEventListener('click', (ev) => {
 function openSessionModal(sessionId) {
   const s = Store.sessions().find(x => x.id === sessionId);
   if (!s) return;
-  const m = Store.members().find(x => x.id === s.memberId);
-  if (!m) return;
+  const m = s.memberId ? Store.members().find(x => x.id === s.memberId) : null;
+  const isPersonal = !m;
 
   const endTime = computeEndTime(s.startTime, s.durationMin);
-  $('#ms-title').textContent = `${m.name}님 수업`;
-  const memoLine = m.memo
-    ? `<div class="modal-row"><span class="modal-label">메모</span><span class="modal-value">${esc(m.memo)}</span></div>`
-    : '';
-  $('#ms-body').innerHTML = `
-    <div class="modal-row"><span class="modal-label">회원</span>
-      <span class="modal-value"><span class="swatch" style="background:${m.color}"></span> ${esc(m.name)}</span>
-    </div>
-    <div class="modal-row"><span class="modal-label">날짜</span><span class="modal-value">${esc(s.date)}</span></div>
-    <div class="modal-row"><span class="modal-label">시간</span><span class="modal-value">${esc(s.startTime)} ~ ${esc(endTime)} <span class="hint">(${s.durationMin}분)</span></span></div>
-    ${memoLine}
-  `;
+  $('#ms-title').textContent = isPersonal ? (s.title || '내 일정') : `${m.name}님 수업`;
+
+  if (isPersonal) {
+    $('#ms-body').innerHTML = `
+      <div class="modal-row"><span class="modal-label">제목</span><span class="modal-value">${esc(s.title || '내 일정')}</span></div>
+      <div class="modal-row"><span class="modal-label">날짜</span><span class="modal-value">${esc(s.date)}</span></div>
+      <div class="modal-row"><span class="modal-label">시간</span><span class="modal-value">${esc(s.startTime)} ~ ${esc(endTime)} <span class="hint">(${s.durationMin}분)</span></span></div>
+    `;
+    $('#ms-edit-member').hidden = true;
+  } else {
+    const memoLine = m.memo
+      ? `<div class="modal-row"><span class="modal-label">메모</span><span class="modal-value">${esc(m.memo)}</span></div>`
+      : '';
+    $('#ms-body').innerHTML = `
+      <div class="modal-row"><span class="modal-label">회원</span>
+        <span class="modal-value"><span class="swatch" style="background:${m.color}"></span> ${esc(m.name)}</span>
+      </div>
+      <div class="modal-row"><span class="modal-label">날짜</span><span class="modal-value">${esc(s.date)}</span></div>
+      <div class="modal-row"><span class="modal-label">시간</span><span class="modal-value">${esc(s.startTime)} ~ ${esc(endTime)} <span class="hint">(${s.durationMin}분)</span></span></div>
+      ${memoLine}
+    `;
+    $('#ms-edit-member').hidden = false;
+    $('#ms-edit-member').onclick = () => {
+      $('#modal-session').close();
+      openMemberModal(m.id);
+    };
+  }
 
   $('#ms-delete').onclick = async () => {
-    if (!confirm('이 수업을 삭제할까요?')) return;
+    if (!confirm('이 일정을 삭제할까요?')) return;
     try {
       await Store.removeSession(s.id);
       $('#modal-session').close();
-      flash('수업이 삭제되었습니다.');
+      flash('삭제되었습니다.');
     } catch (err) {
       alert('삭제 오류: ' + err.message);
     }
-  };
-  $('#ms-edit-member').onclick = () => {
-    $('#modal-session').close();
-    openMemberModal(m.id);
   };
 
   $('#modal-session').showModal();
@@ -403,8 +506,13 @@ function openMemberModal(memberId) {
   $('#mm-color').value = m.color;
   syncPaletteSelection(document.querySelector('.color-palette[data-target="mm-color"]'), m.color);
   $('#mm-memo').value = m.memo || '';
+  const statusSel = $('#mm-status');
+  if (statusSel) statusSel.value = m.status || 'active';
   const cnt = Store.countByMember()[m.id] || 0;
-  $('#mm-stats').textContent = `등록된 수업 ${cnt}건`;
+  const statusInfo = m.status && m.status !== 'active'
+    ? ` · ${statusLabel(m.status)}${m.statusAt ? ` (${m.statusAt})` : ''}`
+    : '';
+  $('#mm-stats').textContent = `등록된 수업 ${cnt}건${statusInfo}`;
 
   $('#mm-save').onclick = async () => {
     try {
@@ -412,6 +520,7 @@ function openMemberModal(memberId) {
         name: $('#mm-name').value,
         color: $('#mm-color').value,
         memo: $('#mm-memo').value,
+        status: $('#mm-status')?.value || 'active',
       });
       $('#modal-member').close();
       flash('저장되었습니다.');
@@ -553,52 +662,124 @@ $('#btn-text-parse').addEventListener('click', () => {
 });
 
 // ---------- XLSX stats export ----------
+const SESSION_MIN = 50; // 1 세션 = 50분
+const toSessions = (min) => +(min / SESSION_MIN).toFixed(2);
+
 $('#btn-stats-xlsx').addEventListener('click', () => {
-  const sessions = Store.sessions();
+  const sessions = Store.sessions().filter(s => s.memberId); // PT 세션만 (트레이너 개인 일정 제외)
   if (!sessions.length) { alert('수업 데이터가 없습니다.'); return; }
   const members = Store.members();
   const memberMap = Object.fromEntries(members.map(m => [m.id, m]));
 
-  // Sheet 1: 월별 요약
+  // member.firstDate / member.lastDate
+  const firstByMember = {}, lastByMember = {};
+  for (const s of sessions) {
+    if (!firstByMember[s.memberId] || s.date < firstByMember[s.memberId]) firstByMember[s.memberId] = s.date;
+    if (!lastByMember[s.memberId] || s.date > lastByMember[s.memberId]) lastByMember[s.memberId] = s.date;
+  }
+
+  // Per-month aggregation
   const monthly = {};
   for (const s of sessions) {
     const ym = (s.date || '').slice(0, 7);
     if (!ym) continue;
-    if (!monthly[ym]) monthly[ym] = { count: 0, totalMin: 0, members: new Set() };
-    monthly[ym].count++;
-    monthly[ym].totalMin += s.durationMin || 0;
+    if (!monthly[ym]) monthly[ym] = { sessions: 0, members: new Set() };
+    monthly[ym].sessions += toSessions(s.durationMin || 0);
     monthly[ym].members.add(s.memberId);
   }
   const months = Object.keys(monthly).sort();
-  const summaryRows = months.map(ym => ({
-    '월': ym,
-    '총 수업': monthly[ym].count,
-    '총 시간(분)': monthly[ym].totalMin,
-    '총 시간(시간)': +(monthly[ym].totalMin / 60).toFixed(1),
-    '활성 회원 수': monthly[ym].members.size,
-  }));
 
-  // Sheet 2: 회원별 월별 (pivot)
+  // 신규 회원: first session is in this month
+  const newPerMonth = {};
+  for (const mid in firstByMember) {
+    const ym = firstByMember[mid].slice(0, 7);
+    newPerMonth[ym] = (newPerMonth[ym] || 0) + 1;
+  }
+
+  // 종료/연장 회원: from member.status_at (if schema migrated)
+  const endedPerMonth = {}, extendedPerMonth = {};
+  for (const m of members) {
+    if (!m.status || !m.statusAt || m.status === 'active') continue;
+    const ym = (m.statusAt || '').slice(0, 7);
+    if (!ym) continue;
+    if (m.status === 'ended') endedPerMonth[ym] = (endedPerMonth[ym] || 0) + 1;
+    if (m.status === 'extended') extendedPerMonth[ym] = (extendedPerMonth[ym] || 0) + 1;
+  }
+
+  // 휴면: had sessions but none in current/last 30 days (compute per month: had session in prior months but 0 this month)
+  const sessionDatesByMember = {};
+  for (const s of sessions) {
+    if (!sessionDatesByMember[s.memberId]) sessionDatesByMember[s.memberId] = new Set();
+    sessionDatesByMember[s.memberId].add(s.date.slice(0, 7));
+  }
+
+  // ---- Sheet 1: 월별 요약 ----
+  const summaryRows = months.map((ym, i) => {
+    const prev = i > 0 ? monthly[months[i - 1]].sessions : null;
+    const sess = +monthly[ym].sessions.toFixed(2);
+    const delta = prev != null ? +(sess - prev).toFixed(2) : null;
+    const deltaPct = prev != null && prev > 0 ? +(((sess - prev) / prev) * 100).toFixed(1) : null;
+    const active = monthly[ym].members.size;
+
+    // 휴면: had sessions before ym but none in ym
+    let dormant = 0;
+    for (const mid in sessionDatesByMember) {
+      const months_ = sessionDatesByMember[mid];
+      const hadBefore = [...months_].some(x => x < ym);
+      const hadThis = months_.has(ym);
+      if (hadBefore && !hadThis) dormant++;
+    }
+
+    return {
+      '월': ym,
+      '세션': sess,
+      '전월 대비': delta,
+      '전월 대비(%)': deltaPct,
+      '활성 회원': active,
+      '신규 회원': newPerMonth[ym] || 0,
+      '연장 회원': extendedPerMonth[ym] || 0,
+      '종료 회원': endedPerMonth[ym] || 0,
+      '휴면 회원': dormant,
+    };
+  });
+
+  // ---- Sheet 2: 회원별 월별 (세션 단위) ----
   const memberMonthly = {};
   for (const s of sessions) {
     const ym = (s.date || '').slice(0, 7);
     if (!ym) continue;
     if (!memberMonthly[s.memberId]) memberMonthly[s.memberId] = {};
-    memberMonthly[s.memberId][ym] = (memberMonthly[s.memberId][ym] || 0) + 1;
+    memberMonthly[s.memberId][ym] = (memberMonthly[s.memberId][ym] || 0) + toSessions(s.durationMin || 0);
   }
   const memberRows = members.map(m => {
-    const row = { '회원': m.name };
+    const row = {
+      '회원': m.name,
+      '상태': statusLabel(m.status),
+      '시작일': firstByMember[m.id] || '-',
+      '최근 수업': lastByMember[m.id] || '-',
+    };
     let total = 0;
     for (const ym of months) {
-      const v = (memberMonthly[m.id] || {})[ym] || 0;
+      const v = +(((memberMonthly[m.id] || {})[ym] || 0)).toFixed(2);
       row[ym] = v;
       total += v;
     }
-    row['총합'] = total;
+    row['총 세션'] = +total.toFixed(2);
     return row;
   });
 
-  // Sheet 3: 전체 수업 목록
+  // ---- Sheet 3: 회원 상세 (특이사항) ----
+  const memberDetail = members.map(m => ({
+    '회원': m.name,
+    '상태': statusLabel(m.status),
+    '상태 변경일': m.statusAt || '-',
+    '시작일': firstByMember[m.id] || '-',
+    '최근 수업': lastByMember[m.id] || '-',
+    '총 세션': +Object.values(memberMonthly[m.id] || {}).reduce((a, b) => a + b, 0).toFixed(2),
+    '메모': m.memo || '',
+  }));
+
+  // ---- Sheet 4: 전체 수업 목록 ----
   const allRows = [...sessions]
     .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime))
     .map(s => ({
@@ -606,16 +787,24 @@ $('#btn-stats-xlsx').addEventListener('click', () => {
       '날짜': s.date,
       '시작': s.startTime,
       '종료': computeEndTime(s.startTime, s.durationMin),
-      '소요(분)': s.durationMin,
+      '세션': toSessions(s.durationMin || 0),
     }));
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), '월별 요약');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(memberRows), '회원별 월별');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(memberDetail), '회원 상세');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allRows), '전체 수업');
-  XLSX.writeFile(wb, `pt_stats_${ymd(new Date())}.xlsx`);
+
+  // 파일명: 가장 최근 수업의 YYYY-MM 기준
+  const latestYm = months[months.length - 1] || ymd(new Date()).slice(0, 7);
+  XLSX.writeFile(wb, `pt_stats_${latestYm}.xlsx`);
   flash('XLSX 다운로드');
 });
+
+function statusLabel(s) {
+  return s === 'extended' ? 'PT 연장' : s === 'ended' ? 'PT 종료' : '활성';
+}
 
 // ---------- footer: last update from GitHub ----------
 async function loadLastUpdate() {
@@ -768,6 +957,11 @@ $('#form-magic').addEventListener('submit', async (e) => {
 $('#btn-signout').addEventListener('click', async () => {
   if (!confirm('로그아웃 하시겠습니까?')) return;
   await signOut();
+});
+
+// Preload holidays on bootstrap (no auth needed, just network).
+preloadHolidays().then(() => {
+  if (state.view === 'calendar') renderCalendar();
 });
 
 async function bootstrap() {

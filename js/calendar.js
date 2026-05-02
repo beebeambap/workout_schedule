@@ -1,7 +1,19 @@
+import { lookupHoliday } from './holidays.js';
+
 const DOW_KR = ['일', '월', '화', '수', '목', '금', '토'];
 const DEFAULT_START = 6;
 const DEFAULT_END = 22; // exclusive
 const HOUR_HEIGHT = 56; // pixels per hour
+
+function dayClass(date) {
+  // returns extra class names based on day of week / holiday
+  const dow = date.getDay();
+  const cls = [];
+  if (dow === 0) cls.push('dow-sun');
+  else if (dow === 6) cls.push('dow-sat');
+  if (lookupHoliday(ymd(date))) cls.push('is-holiday');
+  return cls.join(' ');
+}
 
 const pad = n => String(n).padStart(2, '0');
 export const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -98,8 +110,11 @@ export function renderWeek(container, anchor, sessions, members, fitToSessions =
   html += `<div class="wg-header">`;
   html += `<div class="wg-corner"></div>`;
   for (const d of days) {
-    const cls = ymd(d) === today ? 'wg-day-head today' : 'wg-day-head';
-    html += `<div class="${cls}">${d.getMonth() + 1}/${d.getDate()} (${DOW_KR[d.getDay()]})</div>`;
+    const isToday = ymd(d) === today ? ' today' : '';
+    const dc = dayClass(d);
+    const holiday = lookupHoliday(ymd(d));
+    const sub = holiday ? `<span class="wg-holiday-name">${escapeHtml(holiday)}</span>` : '';
+    html += `<div class="wg-day-head${isToday} ${dc}">${d.getMonth() + 1}/${d.getDate()} (${DOW_KR[d.getDay()]})${sub}</div>`;
   }
   html += `</div>`;
 
@@ -137,8 +152,9 @@ export function renderWeek(container, anchor, sessions, members, fitToSessions =
     const baseMin = hStart * 60;
     for (const e of laid) {
       const m = memberMap[e.memberId];
-      const color = m?.color || '#6b7280';
-      const name = m?.name || '?';
+      const isPersonal = !m;
+      const color = isPersonal ? '#6b7280' : (m?.color || '#6b7280');
+      const display = isPersonal ? (e.title || '내 일정') : (m?.name || '?');
       const top = ((e.startMin - baseMin) / 60) * HOUR_HEIGHT;
       const height = Math.max(20, ((e.endMin - e.startMin) / 60) * HOUR_HEIGHT - 1);
       const widthPct = 100 / e.totalLanes;
@@ -146,9 +162,10 @@ export function renderWeek(container, anchor, sessions, members, fitToSessions =
       const endTime = computeEndTime(e.startTime, e.durationMin);
       const label = hideMemberName
         ? `<span class="ev-time">${escapeHtml(e.startTime)}~${escapeHtml(endTime)}</span>`
-        : `<span class="ev-name">${escapeHtml(name)}</span><span class="ev-time">${escapeHtml(e.startTime)}</span>`;
+        : `<span class="ev-name">${escapeHtml(display)}</span><span class="ev-time">${escapeHtml(e.startTime)}</span>`;
       const sid = escapeHtml(e.id || '');
-      html += `<div class="wg-event" data-session-id="${sid}" style="top:${top}px;height:${height}px;left:calc(${leftPct}% + 1px);width:calc(${widthPct}% - 2px);background:${color}">${label}</div>`;
+      const evCls = 'wg-event' + (isPersonal ? ' wg-event-personal' : '');
+      html += `<div class="${evCls}" data-session-id="${sid}" style="top:${top}px;height:${height}px;left:calc(${leftPct}% + 1px);width:calc(${widthPct}% - 2px);background:${color}">${label}</div>`;
     }
 
     html += `</div>`;
@@ -209,20 +226,25 @@ export function renderMonth(container, anchor, sessions, members, opts = {}) {
     let cls = 'day';
     if (d.getMonth() !== anchor.getMonth()) cls += ' other';
     if (dStr === today) cls += ' today';
+    cls += ' ' + dayClass(d);
+    const holiday = lookupHoliday(dStr);
     const evs = sessions
       .filter(s => s.date === dStr)
       .sort((a, b) => a.startTime.localeCompare(b.startTime))
       .map(s => {
         const m = memberMap[s.memberId];
-        const color = m?.color || '#6b7280';
-        const name = m?.name || '?';
+        const isPersonal = !m;
+        const color = isPersonal ? '#6b7280' : (m?.color || '#6b7280');
+        const display = isPersonal ? (s.title || '내 일정') : (m?.name || '?');
         const label = hideMemberName
           ? `${escapeHtml(s.startTime)}~${escapeHtml(computeEndTime(s.startTime, s.durationMin))}`
-          : `${escapeHtml(name)} ${escapeHtml(s.startTime)}`;
+          : `${escapeHtml(display)} ${escapeHtml(s.startTime)}`;
         const sid = escapeHtml(s.id || '');
-        return `<span class="ev" data-session-id="${sid}" style="background:${color}">${label}</span>`;
+        const evCls = 'ev' + (isPersonal ? ' ev-personal' : '');
+        return `<span class="${evCls}" data-session-id="${sid}" style="background:${color}">${label}</span>`;
       }).join('');
-    html += `<div class="${cls}"><span class="day-num">${d.getDate()}</span>${evs}</div>`;
+    const holidayLine = holiday ? `<span class="day-holiday">${escapeHtml(holiday)}</span>` : '';
+    html += `<div class="${cls}"><span class="day-num">${d.getDate()}</span>${holidayLine}${evs}</div>`;
   }
   html += '</div>';
   container.innerHTML = html;
