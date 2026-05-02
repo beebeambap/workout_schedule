@@ -23,7 +23,7 @@
     <button data-view="members">회원</button>
   </nav>
   <div class="account">
-    <span id="account-email" class="account-email"></span>
+    <button id="btn-profile" type="button" class="account-name" title="프로필 편집">…</button>
     <button id="btn-signout" type="button">로그아웃</button>
   </div>
 </header>
@@ -73,6 +73,7 @@
         </select>
         <button id="btn-export">JPG 저장</button>
         <button id="btn-export-all" title="모든 회원을 개별 JPG로 저장">회원별 일괄</button>
+        <button id="btn-stats-xlsx" title="월별 통계 엑셀">통계 XLSX</button>
       </div>
     </div>
     <div id="calendar" class="calendar-canvas"></div>
@@ -82,6 +83,7 @@
     <div class="tabs">
       <button data-tab="typing" class="active">타이핑</button>
       <button data-tab="csv">CSV</button>
+      <button data-tab="text">텍스트</button>
       <button data-tab="xlsx" hidden>Excel</button>
     </div>
 
@@ -101,6 +103,22 @@
         <button type="button" id="btn-sample-csv">샘플 CSV 다운로드</button>
       </div>
       <input type="file" id="file-csv" accept=".csv,text/csv">
+    </div>
+
+    <div id="tab-text" class="tab">
+      <p class="hint">날짜는 한 줄, 그 아래 회원명과 시간. 날짜는 <code>2026-05-04</code>, <code>260504</code>, <code>2026년 5월 4일</code> 모두 인식합니다.</p>
+      <textarea id="text-input" class="ocr-text" rows="10"
+        placeholder="예시:
+260504
+김민수 09:00
+박지영 10:30
+
+260506
+김민수 09:00
+이도윤 18:00"></textarea>
+      <div class="row-actions">
+        <button type="button" id="btn-text-parse">미리보기에 추가</button>
+      </div>
     </div>
 
     <div id="tab-xlsx" class="tab" hidden>
@@ -124,13 +142,22 @@
   <section id="view-members" class="view">
     <form id="form-member" class="grid-form">
       <label>회원명<input name="name" required></label>
-      <label>색상<input type="color" name="color" value="#3b82f6"></label>
       <label>메모(선택)<input name="memo" placeholder="특이사항, 부상 이력 등"></label>
+      <div class="form-color">
+        <span class="form-color-label">색상</span>
+        <div class="color-palette" data-target="form-member-color"></div>
+        <input type="hidden" name="color" id="form-member-color" value="#3b82f6">
+      </div>
       <button type="submit">회원 추가</button>
     </form>
     <ul id="member-list" class="member-list"></ul>
   </section>
 </main>
+
+<footer id="app-footer" class="site-footer">
+  <span>최종 업데이트: <span id="last-update">…</span></span>
+  <span class="watermark">© beebeambap</span>
+</footer>
 
 <dialog id="modal-session" class="modal">
   <div class="modal-content">
@@ -151,13 +178,68 @@
     <h3>회원 정보</h3>
     <div class="modal-body">
       <label>이름<input id="mm-name" type="text" required></label>
-      <label>색상<input id="mm-color" type="color"></label>
+      <div class="form-color">
+        <span class="form-color-label">색상</span>
+        <div class="color-palette" data-target="mm-color"></div>
+        <input type="hidden" id="mm-color" value="#3b82f6">
+      </div>
       <label>메모<textarea id="mm-memo" rows="5" placeholder="특이사항, 부상, 컨디션, 목표 등"></textarea></label>
       <p id="mm-stats" class="hint"></p>
     </div>
     <div class="modal-actions">
       <button type="button" id="mm-delete" class="danger">회원 삭제</button>
       <button type="button" id="mm-save" class="primary">저장</button>
+      <button type="button" data-close>닫기</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="modal-member-detail" class="modal modal-wide">
+  <div class="modal-content">
+    <button class="modal-close" data-close aria-label="닫기">&times;</button>
+    <div class="md-layout">
+      <section class="md-main">
+        <h3 id="md-title">스케줄</h3>
+        <div class="md-toolbar">
+          <button type="button" id="md-prev">←</button>
+          <span id="md-period"></span>
+          <button type="button" id="md-next">→</button>
+          <button type="button" id="md-today">오늘</button>
+          <select id="md-mode">
+            <option value="week">주간</option>
+            <option value="month">월간</option>
+          </select>
+        </div>
+        <div id="md-calendar" class="md-calendar"></div>
+      </section>
+      <aside class="md-side">
+        <div class="md-id">
+          <span id="md-color" class="md-color-circle"></span>
+          <h4 id="md-name"></h4>
+        </div>
+        <p id="md-stats" class="hint"></p>
+        <div class="md-section">
+          <h5>메모</h5>
+          <p id="md-memo"></p>
+        </div>
+        <div class="md-actions">
+          <button type="button" id="md-edit">정보 편집</button>
+        </div>
+      </aside>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="modal-profile" class="modal">
+  <div class="modal-content">
+    <button class="modal-close" data-close aria-label="닫기">&times;</button>
+    <h3>코치 프로필</h3>
+    <div class="modal-body">
+      <label>이름 / 별명<input id="pf-nickname" type="text" placeholder="예: 홍길동"></label>
+      <p class="hint">상단 우측에 "○○ 코치님" 형식으로 표기됩니다. 비워두면 이메일이 표기됩니다.</p>
+    </div>
+    <div class="modal-actions">
+      <button type="button" id="pf-save" class="primary">저장</button>
       <button type="button" data-close>닫기</button>
     </div>
   </div>

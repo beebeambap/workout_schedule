@@ -25,6 +25,13 @@ export async function signOut() {
   await sb.auth.signOut();
 }
 
+export async function updateUserMetadata(data) {
+  if (!sb) throw new Error('Supabase가 설정되지 않았습니다.');
+  const { data: result, error } = await sb.auth.updateUser({ data });
+  if (error) throw error;
+  return result.user;
+}
+
 export function onAuthChange(cb) {
   if (!sb) return () => {};
   const { data } = sb.auth.onAuthStateChange((_event, session) => cb(session));

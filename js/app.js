@@ -1,9 +1,11 @@
 import { Store } from './store.js';
-import { parseCSV, parseXLSX } from './parser.js';
+import { parseCSV, parseXLSX, parseFreeText } from './parser.js';
 import { renderWeek, renderMonth, computeEndTime } from './calendar.js';
 import { exportSchedule } from './exporter.js';
 import { sbReady, status as sbStatus } from './supabase.js';
-import { getSession, sendMagicLink, signOut, onAuthChange } from './auth.js';
+import { getSession, sendMagicLink, signOut, onAuthChange, updateUserMetadata } from './auth.js';
+
+const COLOR_PALETTE = ['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#06b6d4'];
 
 const state = {
   view: 'calendar',
@@ -20,6 +22,31 @@ const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())
 const esc = (s) => String(s).replace(/[&<>"']/g, c => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
 ));
+
+// ---------- color palette ----------
+function buildColorPalettes() {
+  document.querySelectorAll('.color-palette').forEach(palette => {
+    const target = document.getElementById(palette.dataset.target);
+    if (!palette.children.length) {
+      palette.innerHTML = COLOR_PALETTE.map(c =>
+        `<button type="button" class="color-swatch" data-color="${c}" style="background:${c}" aria-label="${c}"></button>`
+      ).join('');
+    }
+    palette.querySelectorAll('.color-swatch').forEach(s => {
+      s.addEventListener('click', () => {
+        target.value = s.dataset.color;
+        palette.querySelectorAll('.color-swatch').forEach(x =>
+          x.classList.toggle('selected', x.dataset.color === s.dataset.color));
+      });
+    });
+    syncPaletteSelection(palette, target.value);
+  });
+}
+function syncPaletteSelection(palette, value) {
+  palette.querySelectorAll('.color-swatch').forEach(x =>
+    x.classList.toggle('selected', x.dataset.color === value));
+}
+buildColorPalettes();
 
 // ---------- view switching ----------
 $$('.topbar nav button').forEach(b => {
@@ -197,7 +224,9 @@ $('#form-member').addEventListener('submit', async (e) => {
   try {
     await Store.ensureMember(name, fd.get('color'), String(fd.get('memo') || '').trim());
     e.target.reset();
-    e.target.elements.color.value = '#3b82f6';
+    const c = $('#form-member-color');
+    c.value = '#3b82f6';
+    syncPaletteSelection(document.querySelector('.color-palette[data-target="form-member-color"]'), c.value);
   } catch (err) {
     alert('저장 오류: ' + err.message);
   }
@@ -213,23 +242,24 @@ function renderMembers() {
   }
   ul.innerHTML = ms.map(m => {
     const memoPreview = (m.memo || '').replace(/\s+/g, ' ').trim();
-    return `<li data-id="${m.id}">
-      <span class="swatch" style="background:${m.color}"></span>
-      <div class="ml-info">
-        <div class="ml-row1"><span class="ml-name">${esc(m.name)}</span><span class="count">수업 ${counts[m.id] || 0}건</span></div>
-        ${memoPreview ? `<div class="ml-memo">${esc(memoPreview)}</div>` : ''}
+    return `<li class="member-card" data-id="${m.id}">
+      <div class="mc-head">
+        <span class="mc-color" style="background:${m.color}"></span>
+        <button class="mc-edit" data-id="${m.id}" title="정보 편집" aria-label="정보 편집">✎</button>
       </div>
-      <button class="ml-edit" data-id="${m.id}">편집</button>
+      <div class="mc-name">${esc(m.name)}</div>
+      <div class="mc-count">수업 ${counts[m.id] || 0}건</div>
+      ${memoPreview ? `<div class="mc-memo">${esc(memoPreview)}</div>` : '<div class="mc-memo mc-memo-empty">메모 없음</div>'}
     </li>`;
   }).join('');
-  ul.querySelectorAll('.ml-edit').forEach(b => {
+  ul.querySelectorAll('.mc-edit').forEach(b => {
     b.addEventListener('click', (ev) => {
       ev.stopPropagation();
       openMemberModal(b.dataset.id);
     });
   });
-  ul.querySelectorAll('li[data-id]').forEach(li => {
-    li.addEventListener('click', () => openMemberModal(li.dataset.id));
+  ul.querySelectorAll('li.member-card').forEach(li => {
+    li.addEventListener('click', () => openMemberDetail(li.dataset.id));
   });
 }
 
@@ -371,6 +401,7 @@ function openMemberModal(memberId) {
   if (!m) return;
   $('#mm-name').value = m.name;
   $('#mm-color').value = m.color;
+  syncPaletteSelection(document.querySelector('.color-palette[data-target="mm-color"]'), m.color);
   $('#mm-memo').value = m.memo || '';
   const cnt = Store.countByMember()[m.id] || 0;
   $('#mm-stats').textContent = `등록된 수업 ${cnt}건`;
@@ -401,6 +432,203 @@ function openMemberModal(memberId) {
 
   $('#modal-member').showModal();
 }
+
+// ---------- member detail modal (calendar + info) ----------
+const detailState = { memberId: null, anchor: new Date(), mode: 'week' };
+
+function openMemberDetail(memberId) {
+  detailState.memberId = memberId;
+  detailState.anchor = new Date();
+  detailState.mode = 'week';
+  $('#md-mode').value = 'week';
+  renderMemberDetail();
+  $('#modal-member-detail').showModal();
+}
+
+function renderMemberDetail() {
+  const m = Store.members().find(x => x.id === detailState.memberId);
+  if (!m) return;
+  const sessions = Store.sessions().filter(s => s.memberId === m.id);
+
+  $('#md-title').textContent = `${m.name}님 스케줄`;
+  $('#md-color').style.background = m.color;
+  $('#md-name').textContent = m.name;
+  $('#md-stats').textContent = `등록된 수업 ${sessions.length}건`;
+  const memoEl = $('#md-memo');
+  if (m.memo) {
+    memoEl.textContent = m.memo;
+    memoEl.classList.remove('mc-memo-empty');
+  } else {
+    memoEl.textContent = '메모 없음';
+    memoEl.classList.add('mc-memo-empty');
+  }
+
+  const cont = $('#md-calendar');
+  const label = detailState.mode === 'week'
+    ? renderWeek(cont, detailState.anchor, sessions, [m], true, { hideMemberName: true })
+    : renderMonth(cont, detailState.anchor, sessions, [m], { hideMemberName: true });
+  $('#md-period').textContent = label;
+}
+
+$('#md-prev').addEventListener('click', () => {
+  detailState.anchor = detailState.mode === 'week'
+    ? new Date(detailState.anchor.getTime() - 7 * 86400000)
+    : new Date(detailState.anchor.getFullYear(), detailState.anchor.getMonth() - 1, 1);
+  renderMemberDetail();
+});
+$('#md-next').addEventListener('click', () => {
+  detailState.anchor = detailState.mode === 'week'
+    ? new Date(detailState.anchor.getTime() + 7 * 86400000)
+    : new Date(detailState.anchor.getFullYear(), detailState.anchor.getMonth() + 1, 1);
+  renderMemberDetail();
+});
+$('#md-today').addEventListener('click', () => {
+  detailState.anchor = new Date();
+  renderMemberDetail();
+});
+$('#md-mode').addEventListener('change', (e) => {
+  detailState.mode = e.target.value;
+  renderMemberDetail();
+});
+$('#md-edit').addEventListener('click', () => {
+  $('#modal-member-detail').close();
+  if (detailState.memberId) openMemberModal(detailState.memberId);
+});
+$('#md-calendar').addEventListener('click', (ev) => {
+  const target = ev.target.closest('[data-session-id]');
+  if (!target) return;
+  if (target.dataset.sessionId) openSessionModal(target.dataset.sessionId);
+});
+
+// ---------- trainer profile (nickname stored in user_metadata) ----------
+let currentSession = null;
+
+function applyAccountChip(session) {
+  currentSession = session;
+  const nick = session?.user?.user_metadata?.nickname || '';
+  const email = session?.user?.email || '';
+  $('#btn-profile').textContent = nick ? `${nick} 코치님` : email;
+  $('#btn-profile').title = email + (nick ? '' : ' (별명 설정하기)');
+}
+
+$('#btn-profile').addEventListener('click', () => {
+  if (!currentSession) return;
+  const nick = currentSession.user?.user_metadata?.nickname || '';
+  $('#pf-nickname').value = nick;
+  $('#modal-profile').showModal();
+});
+
+$('#pf-save').onclick = async () => {
+  const nick = $('#pf-nickname').value.trim();
+  try {
+    const user = await updateUserMetadata({ nickname: nick });
+    currentSession = { ...currentSession, user };
+    applyAccountChip(currentSession);
+    $('#modal-profile').close();
+    flash('저장되었습니다.');
+  } catch (err) {
+    alert('저장 오류: ' + err.message);
+  }
+};
+
+// ---------- text-input tab ----------
+$('#btn-text-parse').addEventListener('click', () => {
+  const text = $('#text-input').value;
+  if (!text.trim()) { alert('텍스트가 비어 있습니다.'); return; }
+  const parsed = parseFreeText(text);
+  if (!parsed.sessions.length) {
+    alert('일정을 찾지 못했습니다.\n\n예시:\n260504\n김민수 09:00\n박지영 10:30');
+    return;
+  }
+  appendToPreview(parsed.sessions);
+  flash(`${parsed.sessions.length}건이 미리보기에 추가되었습니다.`);
+});
+
+// ---------- XLSX stats export ----------
+$('#btn-stats-xlsx').addEventListener('click', () => {
+  const sessions = Store.sessions();
+  if (!sessions.length) { alert('수업 데이터가 없습니다.'); return; }
+  const members = Store.members();
+  const memberMap = Object.fromEntries(members.map(m => [m.id, m]));
+
+  // Sheet 1: 월별 요약
+  const monthly = {};
+  for (const s of sessions) {
+    const ym = (s.date || '').slice(0, 7);
+    if (!ym) continue;
+    if (!monthly[ym]) monthly[ym] = { count: 0, totalMin: 0, members: new Set() };
+    monthly[ym].count++;
+    monthly[ym].totalMin += s.durationMin || 0;
+    monthly[ym].members.add(s.memberId);
+  }
+  const months = Object.keys(monthly).sort();
+  const summaryRows = months.map(ym => ({
+    '월': ym,
+    '총 수업': monthly[ym].count,
+    '총 시간(분)': monthly[ym].totalMin,
+    '총 시간(시간)': +(monthly[ym].totalMin / 60).toFixed(1),
+    '활성 회원 수': monthly[ym].members.size,
+  }));
+
+  // Sheet 2: 회원별 월별 (pivot)
+  const memberMonthly = {};
+  for (const s of sessions) {
+    const ym = (s.date || '').slice(0, 7);
+    if (!ym) continue;
+    if (!memberMonthly[s.memberId]) memberMonthly[s.memberId] = {};
+    memberMonthly[s.memberId][ym] = (memberMonthly[s.memberId][ym] || 0) + 1;
+  }
+  const memberRows = members.map(m => {
+    const row = { '회원': m.name };
+    let total = 0;
+    for (const ym of months) {
+      const v = (memberMonthly[m.id] || {})[ym] || 0;
+      row[ym] = v;
+      total += v;
+    }
+    row['총합'] = total;
+    return row;
+  });
+
+  // Sheet 3: 전체 수업 목록
+  const allRows = [...sessions]
+    .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime))
+    .map(s => ({
+      '회원': memberMap[s.memberId]?.name || '?',
+      '날짜': s.date,
+      '시작': s.startTime,
+      '종료': computeEndTime(s.startTime, s.durationMin),
+      '소요(분)': s.durationMin,
+    }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), '월별 요약');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(memberRows), '회원별 월별');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allRows), '전체 수업');
+  XLSX.writeFile(wb, `pt_stats_${ymd(new Date())}.xlsx`);
+  flash('XLSX 다운로드');
+});
+
+// ---------- footer: last update from GitHub ----------
+async function loadLastUpdate() {
+  const el = document.getElementById('last-update');
+  if (!el) return;
+  try {
+    const res = await fetch('https://api.github.com/repos/beebeambap/workout_schedule/commits?per_page=1', {
+      headers: { 'Accept': 'application/vnd.github+json' }
+    });
+    if (!res.ok) throw new Error(res.status);
+    const commits = await res.json();
+    const d = new Date(commits[0].commit.committer.date);
+    el.textContent = d.toLocaleString('ko-KR', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    });
+  } catch (e) {
+    el.textContent = '—';
+  }
+}
+loadLastUpdate();
 
 // Generic modal close
 document.querySelectorAll('[data-close]').forEach(b => {
@@ -446,7 +674,12 @@ function showApp(session) {
   hide('auth-screen');
   show('app-topbar');
   show('app-main');
-  $('#account-email').textContent = session?.user?.email || '';
+  applyAccountChip(session);
+  // First-time prompt for nickname if missing
+  if (!session?.user?.user_metadata?.nickname && !sessionStorage.getItem('promptedNickname')) {
+    sessionStorage.setItem('promptedNickname', '1');
+    setTimeout(() => $('#btn-profile').click(), 500);
+  }
 }
 
 async function maybeMigrateLocal() {

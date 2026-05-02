@@ -25,6 +25,22 @@ function parseDate(s) {
   // Korean: 2026년 5월 4일
   let m = str.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일?/);
   if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+  // 8 digits no separator: 20260504
+  m = str.match(/(?:^|[^\d])(\d{4})(\d{2})(\d{2})(?:[^\d]|$)/);
+  if (m) {
+    const mo = parseInt(m[2], 10), da = parseInt(m[3], 10);
+    if (mo >= 1 && mo <= 12 && da >= 1 && da <= 31) {
+      return `${m[1]}-${m[2]}-${m[3]}`;
+    }
+  }
+  // 6 digits no separator: 260504  → 2026-05-04
+  m = str.match(/(?:^|[^\d])(\d{2})(\d{2})(\d{2})(?:[^\d]|$)/);
+  if (m) {
+    const mo = parseInt(m[2], 10), da = parseInt(m[3], 10);
+    if (mo >= 1 && mo <= 12 && da >= 1 && da <= 31) {
+      return `20${m[1]}-${m[2]}-${m[3]}`;
+    }
+  }
   // ISO-like: 2026-05-04 / 2026/5/4 / 2026.5.4 / 2026 5 4
   m = str.match(/(\d{4})[-./\s](\d{1,2})[-./\s](\d{1,2})/);
   if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
@@ -104,3 +120,34 @@ export async function parseXLSX(file) {
   return rowsToSessions(norm);
 }
 
+
+// Free-form text parser. Pairs Korean names with times line by line under
+// a date anchor from a prior line. Date formats: 2026-05-04, 260504,
+// 20260504, 2026년 5월 4일, etc. Supports both name-time and time-name order.
+export function parseFreeText(text) {
+  const lines = String(text || '').split(/\r?\n/);
+  const sessions = [];
+  let currentDate = null;
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    const dateHit = parseDate(line);
+    if (dateHit) currentDate = dateHit;
+    if (!currentDate) continue;
+    const names = [...line.matchAll(/([가-힯]{2,4})/g)].map(m => m[1]);
+    const times = [...line.matchAll(/(\d{1,2})\s*[:시.]\s*(\d{0,2})/g)]
+      .map(m => ({ h: parseInt(m[1], 10), mi: parseInt(m[2] || '0', 10) }))
+      .filter(t => t.h >= 0 && t.h <= 23 && t.mi >= 0 && t.mi <= 59);
+    if (!names.length || !times.length) continue;
+    const n = Math.min(names.length, times.length);
+    for (let i = 0; i < n; i++) {
+      sessions.push({
+        name: names[i],
+        date: currentDate,
+        startTime: pad(times[i].h) + ':' + pad(times[i].mi),
+        durationMin: 50,
+      });
+    }
+  }
+  return { sessions, warnings: [] };
+}
