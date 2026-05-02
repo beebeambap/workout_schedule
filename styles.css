@@ -1,4 +1,5 @@
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body {
   margin: 0;
   font-family: 'Noto Sans KR', system-ui, sans-serif;
@@ -60,6 +61,12 @@ body {
 .auth-card button[type="submit"]:hover { background: #1f2937; }
 .auth-card .auth-status { margin: 12px 0 0; font-size: 13px; color: #2563eb; min-height: 18px; }
 .auth-card ol { padding-left: 20px; line-height: 1.7; }
+.config-status {
+  list-style: none; padding: 12px 14px; margin: 12px 0;
+  background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;
+  font-size: 13px; line-height: 1.9;
+}
+.config-status li { display: flex; justify-content: space-between; gap: 8px; }
 
 main { max-width: 1200px; margin: 0 auto; padding: 20px; }
 

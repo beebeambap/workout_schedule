@@ -2,7 +2,7 @@ import { Store } from './store.js';
 import { parseCSV, parseXLSX } from './parser.js';
 import { renderWeek, renderMonth, computeEndTime } from './calendar.js';
 import { exportSchedule } from './exporter.js';
-import { sbReady } from './supabase.js';
+import { sbReady, status as sbStatus } from './supabase.js';
 import { getSession, sendMagicLink, signOut, onAuthChange } from './auth.js';
 
 const state = {
@@ -531,6 +531,16 @@ $('#btn-signout').addEventListener('click', async () => {
 
 async function bootstrap() {
   if (!sbReady) {
+    const ul = document.getElementById('config-status');
+    if (ul) {
+      const ok = (b) => b ? '<span style="color:#059669">✓ 설정됨</span>'
+                          : '<span style="color:#dc2626">✗ 누락</span>';
+      ul.innerHTML = `
+        <li><b>SUPABASE_URL</b>: ${ok(sbStatus.url)}</li>
+        <li><b>SUPABASE_ANON_KEY</b>: ${ok(sbStatus.key)}</li>
+        <li><b>Supabase 라이브러리(CDN)</b>: ${ok(sbStatus.lib)}</li>
+      `;
+    }
     show('config-screen');
     return;
   }
