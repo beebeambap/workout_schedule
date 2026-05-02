@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PT 스케줄러</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <h1>PT 스케줄러</h1>
+  <nav>
+    <button data-view="calendar" class="active">캘린더</button>
+    <button data-view="import">가져오기</button>
+    <button data-view="members">회원</button>
+  </nav>
+</header>
+
+<main>
+  <section id="view-calendar" class="view active">
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <button id="btn-prev" title="이전">←</button>
+        <span id="period-label"></span>
+        <button id="btn-next" title="다음">→</button>
+        <button id="btn-today">오늘</button>
+      </div>
+      <div class="toolbar-right">
+        <select id="view-mode" title="뷰">
+          <option value="week">주간</option>
+          <option value="month">월간</option>
+        </select>
+        <select id="member-filter" title="회원 필터">
+          <option value="">전체 회원</option>
+        </select>
+        <button id="btn-export">JPG 저장</button>
+        <button id="btn-export-all" title="모든 회원을 개별 JPG로 저장">회원별 일괄</button>
+      </div>
+    </div>
+    <div id="calendar" class="calendar-canvas"></div>
+  </section>
+
+  <section id="view-import" class="view">
+    <div class="tabs">
+      <button data-tab="typing" class="active">타이핑</button>
+      <button data-tab="csv">CSV</button>
+      <button data-tab="xlsx">Excel</button>
+      <button data-tab="image">이미지(OCR)</button>
+    </div>
+
+    <div id="tab-typing" class="tab active">
+      <form id="form-typing" class="grid-form">
+        <label>회원명<input name="name" required placeholder="예: 김민수"></label>
+        <label>날짜<input type="date" name="date" required></label>
+        <label>시작 시간<input type="time" name="start" required></label>
+        <label>소요(분)<input type="number" name="duration" value="60" min="10" step="5" required></label>
+        <button type="submit">캘린더에 등록</button>
+      </form>
+    </div>
+
+    <div id="tab-csv" class="tab">
+      <p class="hint">헤더: <code>member_name, date, start_time, duration_min</code> (또는 한국어 <code>회원명, 날짜, 시작시간, 소요시간</code>)</p>
+      <input type="file" id="file-csv" accept=".csv,text/csv">
+    </div>
+
+    <div id="tab-xlsx" class="tab">
+      <p class="hint">첫 시트의 1행을 헤더로 사용합니다. 컬럼명은 CSV와 동일.</p>
+      <input type="file" id="file-xlsx" accept=".xlsx,.xls">
+    </div>
+
+    <div id="tab-image" class="tab">
+      <p class="hint">한국어 OCR(베타). 결과를 미리보기에서 검토·보정 후 확정하세요.</p>
+      <input type="file" id="file-image" accept="image/*">
+      <div id="ocr-progress" class="ocr-progress"></div>
+      <details>
+        <summary>OCR 원문 텍스트</summary>
+        <pre id="ocr-text" class="ocr-text"></pre>
+      </details>
+    </div>
+
+    <div id="preview" class="preview hidden">
+      <h3>미리보기</h3>
+      <p class="hint">행을 직접 수정할 수 있습니다. 잘못된 행은 삭제 버튼으로 제거하세요.</p>
+      <div class="preview-table-wrap">
+        <table id="preview-table"></table>
+      </div>
+      <div class="preview-actions">
+        <button id="btn-confirm">확정</button>
+        <button id="btn-cancel">취소</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-members" class="view">
+    <form id="form-member" class="grid-form">
+      <label>회원명<input name="name" required></label>
+      <label>색상<input type="color" name="color" value="#3b82f6"></label>
+      <button type="submit">회원 추가</button>
+    </form>
+    <ul id="member-list" class="member-list"></ul>
+  </section>
+</main>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
