@@ -23,25 +23,27 @@ function formatPeriod(anchor, mode) {
 
 function buildWeekSummary(start, sessions) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
-  let html = `<div class="export-summary">
-    <h3>스케줄 요약</h3>
-    <table class="export-summary-table">
-      <thead><tr><th>요일</th><th>날짜</th><th>수업 시간</th></tr></thead>
-      <tbody>`;
-  for (const d of days) {
+  const cells = days.map(d => {
     const dStr = ymd(d);
     const list = sessions
       .filter(s => s.date === dStr)
       .sort((a, b) => a.startTime.localeCompare(b.startTime))
-      .map(s => `${s.startTime}~${computeEndTime(s.startTime, s.durationMin)}`)
-      .join(', ');
-    html += `<tr>
-      <td>${DOW_KR[d.getDay()]}</td>
-      <td>${d.getMonth() + 1}/${d.getDate()}</td>
-      <td>${escapeHtml(list || '-')}</td>
-    </tr>`;
+      .map(s => `${s.startTime}~${computeEndTime(s.startTime, s.durationMin)}`);
+    return { dow: DOW_KR[d.getDay()], times: list };
+  });
+
+  let html = `<table class="export-summary-table"><tr>`;
+  html += `<td class="summary-label">스케줄 요약</td>`;
+  for (const c of cells) {
+    const timesHtml = c.times.length
+      ? c.times.map(t => `<div class="summary-time">${escapeHtml(t)}</div>`).join('')
+      : `<div class="summary-time summary-empty">-</div>`;
+    html += `<td class="summary-cell">
+      <div class="summary-dow">${c.dow}</div>
+      ${timesHtml}
+    </td>`;
   }
-  html += `</tbody></table></div>`;
+  html += `</tr></table>`;
   return html;
 }
 

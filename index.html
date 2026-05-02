@@ -51,7 +51,7 @@
     <div class="tabs">
       <button data-tab="typing" class="active">타이핑</button>
       <button data-tab="csv">CSV</button>
-      <button data-tab="xlsx">Excel</button>
+      <button data-tab="xlsx" hidden>Excel</button>
       <button data-tab="image">이미지(OCR)</button>
     </div>
 
@@ -67,22 +67,35 @@
 
     <div id="tab-csv" class="tab">
       <p class="hint">헤더: <code>member_name, date, start_time, duration_min</code> (또는 한국어 <code>회원명, 날짜, 시작시간, 소요시간</code>)</p>
+      <div class="row-actions">
+        <button type="button" id="btn-sample-csv">샘플 CSV 다운로드</button>
+      </div>
       <input type="file" id="file-csv" accept=".csv,text/csv">
     </div>
 
-    <div id="tab-xlsx" class="tab">
+    <div id="tab-xlsx" class="tab" hidden>
       <p class="hint">첫 시트의 1행을 헤더로 사용합니다. 컬럼명은 CSV와 동일.</p>
       <input type="file" id="file-xlsx" accept=".xlsx,.xls">
     </div>
 
     <div id="tab-image" class="tab">
-      <p class="hint">한국어 OCR(베타). 결과를 미리보기에서 검토·보정 후 확정하세요.</p>
+      <p class="hint">한국어 OCR(베타). 이미지 업로드 → 자동 인식 → 아래 텍스트를 검토·보정 후 [텍스트에서 추출]을 누르면 미리보기에 채워집니다.</p>
       <input type="file" id="file-image" accept="image/*">
       <div id="ocr-progress" class="ocr-progress"></div>
-      <details>
-        <summary>OCR 원문 텍스트</summary>
-        <pre id="ocr-text" class="ocr-text"></pre>
-      </details>
+      <textarea id="ocr-text" class="ocr-text" rows="8"
+        placeholder="형식 예시 (날짜는 한 줄, 그 아래에 회원명과 시간):
+
+2026-05-04
+김민수 09:00
+박지영 10:30
+
+또는
+
+2026년 5월 4일
+김민수 09:00"></textarea>
+      <div class="row-actions">
+        <button type="button" id="btn-ocr-parse">텍스트에서 추출</button>
+      </div>
     </div>
 
     <div id="preview" class="preview hidden">

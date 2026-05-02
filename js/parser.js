@@ -18,15 +18,19 @@ function normalizeHeader(h) {
 
 function parseDate(s) {
   if (!s) return null;
-  // Excel may give Date objects via XLSX raw:false → still strings, but try Date too
   if (s instanceof Date && !isNaN(s)) {
     return `${s.getFullYear()}-${pad(s.getMonth() + 1)}-${pad(s.getDate())}`;
   }
-  const m = String(s).match(/^(\d{4})[-./\s](\d{1,2})[-./\s](\d{1,2})/);
+  const str = String(s).trim();
+  // Korean: 2026년 5월 4일
+  let m = str.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일?/);
   if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
-  // 25/04/30 형태
-  const m2 = String(s).match(/^(\d{2})[-./](\d{1,2})[-./](\d{1,2})/);
-  if (m2) return `20${m2[1]}-${pad(m2[2])}-${pad(m2[3])}`;
+  // ISO-like: 2026-05-04 / 2026/5/4 / 2026.5.4 / 2026 5 4
+  m = str.match(/(\d{4})[-./\s](\d{1,2})[-./\s](\d{1,2})/);
+  if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+  // 2-digit year: 25/04/30
+  m = str.match(/(\d{2})[-./](\d{1,2})[-./](\d{1,2})/);
+  if (m) return `20${m[1]}-${pad(m[2])}-${pad(m[3])}`;
   return null;
 }
 
@@ -100,9 +104,10 @@ export async function parseXLSX(file) {
   return rowsToSessions(norm);
 }
 
-// Heuristic line parser for OCR text. Looks for date anchors and member+time pairs.
+// Heuristic line parser for OCR text. Pairs Korean names with times found
+// in the same line (regardless of order), under a date anchor from a prior line.
 export function parseFreeText(text) {
-  const lines = text.split(/\r?\n/);
+  const lines = String(text || '').split(/\r?\n/);
   const sessions = [];
   let currentDate = null;
   for (const raw of lines) {
@@ -110,20 +115,24 @@ export function parseFreeText(text) {
     if (!line) continue;
 
     const dateHit = parseDate(line);
-    if (dateHit) currentDate = dateHit;
+    if (dateHit) {
+      currentDate = dateHit;
+      // Don't 'continue' — a single line may contain both a date and entries
+    }
+    if (!currentDate) continue;
 
-    // Korean name (2-4 syllables) + time on same line
-    const re = /([가-힯]{2,4})\s*[,\-:\s]?\s*(\d{1,2})[:시\s.](\d{0,2})/g;
-    let m;
-    while ((m = re.exec(line)) !== null) {
-      if (!currentDate) continue;
-      const h = parseInt(m[2], 10);
-      const mi = parseInt(m[3] || '0', 10);
-      if (h < 0 || h > 23 || mi < 0 || mi > 59) continue;
+    const names = [...line.matchAll(/([가-힯]{2,4})/g)].map(m => m[1]);
+    const times = [...line.matchAll(/(\d{1,2})\s*[:시.]\s*(\d{0,2})/g)]
+      .map(m => ({ h: parseInt(m[1], 10), mi: parseInt(m[2] || '0', 10) }))
+      .filter(t => t.h >= 0 && t.h <= 23 && t.mi >= 0 && t.mi <= 59);
+
+    if (!names.length || !times.length) continue;
+    const n = Math.min(names.length, times.length);
+    for (let i = 0; i < n; i++) {
       sessions.push({
-        name: m[1],
+        name: names[i],
         date: currentDate,
-        startTime: pad(h) + ':' + pad(mi),
+        startTime: pad(times[i].h) + ':' + pad(times[i].mi),
         durationMin: 50
       });
     }

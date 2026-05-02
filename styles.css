@@ -49,55 +49,92 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px; }
   background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;
 }
 
-/* Week view */
-.week-grid {
+/* Week view (absolute time-proportional layout) */
+.wg {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.wg-header {
+  display: grid;
+  grid-template-columns: 60px repeat(7, 1fr);
+  background: #fafafa;
+}
+.wg-corner {
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+}
+.wg-day-head {
+  text-align: center;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px 4px;
+  border-left: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+}
+.wg-day-head.today { background: #fef3c7; }
+.wg-body {
   position: relative;
   display: grid;
   grid-template-columns: 60px repeat(7, 1fr);
-  gap: 1px; background: #e5e7eb;
-  border-radius: 6px; overflow: hidden;
 }
-.week-grid .period-divider {
-  grid-column: 1 / -1;
-  background: #f3f4f6;
-  padding: 4px 12px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #4b5563;
-  letter-spacing: 0.5px;
+.wg-hour-col {
+  border-right: 1px solid #e5e7eb;
+  background: #fafafa;
 }
-.now-line {
+.wg-hour-label {
+  font-size: 11px;
+  color: #6b7280;
+  text-align: center;
+  padding-top: 2px;
+  box-sizing: border-box;
+}
+.wg-day-col {
+  position: relative;
+  border-left: 1px solid #e5e7eb;
+}
+.wg-hour-line {
   position: absolute;
-  right: 0;
+  left: 0; right: 0;
+  border-top: 1px dashed #e5e7eb;
+}
+.wg-hour-line.wg-pm {
+  border-top: 2px solid #cbd5e1;
+}
+.wg-event {
+  position: absolute;
+  border-radius: 4px;
+  padding: 2px 5px;
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.2;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.wg-time-only .wg-event {
+  text-align: center;
+  font-weight: 600;
+  font-size: 12px;
+}
+.wg-now-line {
+  position: absolute;
+  left: 60px; right: 0;
   height: 2px;
   background: #ef4444;
   z-index: 5;
   pointer-events: none;
   box-shadow: 0 0 4px rgba(239, 68, 68, 0.4);
 }
-.now-dot {
+.wg-now-dot {
   position: absolute;
   left: -5px; top: -4px;
   width: 10px; height: 10px;
   border-radius: 50%;
   background: #ef4444;
-}
-.week-grid .head {
-  background: #fafafa; font-weight: 600;
-  text-align: center; padding: 8px 4px; font-size: 13px;
-}
-.week-grid .head.today { background: #fef3c7; }
-.week-grid .hour-label {
-  background: #fafafa; padding: 4px 6px;
-  font-size: 11px; color: #6b7280; text-align: right;
-}
-.week-grid .cell {
-  background: #fff; padding: 2px; min-height: 44px; position: relative;
-}
-.event {
-  display: block; border-radius: 4px; padding: 3px 5px; margin-bottom: 2px;
-  color: #fff; font-size: 11px; line-height: 1.3;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 /* Month view */
@@ -198,10 +235,33 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px; }
 }
 
 .ocr-progress { margin: 8px 0; font-size: 13px; color: #2563eb; }
-.ocr-text {
-  white-space: pre-wrap; max-height: 200px; overflow: auto;
-  background: #f3f4f6; padding: 8px; border-radius: 6px; font-size: 12px;
+textarea.ocr-text {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px;
+  font: 13px/1.5 'Noto Sans KR', system-ui, sans-serif;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  resize: vertical;
+  box-sizing: border-box;
 }
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+}
+.row-actions button {
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+}
+.row-actions button:hover { background: #f9fafb; }
 
 /* Print/export friendly */
 .exporting .toolbar { display: none !important; }
@@ -231,15 +291,17 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px; }
 }
 
 /* Calendar inside export wrapper: tighter borders, centered cells */
-.export-card .week-grid,
+.export-card .wg,
 .export-card .month-grid {
   border: 1px solid #d1d5db;
 }
-.export-card .hour-label {
-  text-align: center;
+.export-card .wg-hour-label {
   font-weight: 600;
+  color: #374151;
 }
-.export-card .week-grid.time-only .event,
+.export-card .wg-day-head {
+  font-size: 14px;
+}
 .export-card .month-grid.time-only .ev {
   text-align: center;
   font-weight: 600;
@@ -247,28 +309,36 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px; }
   letter-spacing: 0.2px;
 }
 
-/* Schedule summary table */
-.export-summary { margin-top: 24px; }
-.export-summary h3 {
-  margin: 0 0 8px;
-  font-size: 16px;
-  font-weight: 700;
-}
+/* Schedule summary: single-row 8-cell table (label + Mon..Sun) */
 .export-summary-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  table-layout: fixed;
+  margin-top: 16px;
+  font-size: 13px;
 }
-.export-summary-table th,
 .export-summary-table td {
   border: 1px solid #d1d5db;
-  padding: 8px;
+  padding: 10px 6px;
   text-align: center;
+  vertical-align: middle;
 }
-.export-summary-table th {
+.summary-label {
   background: #f3f4f6;
   font-weight: 700;
+  font-size: 14px;
+  width: 110px;
 }
-.export-summary-table td:nth-child(1) { width: 80px; }
-.export-summary-table td:nth-child(2) { width: 120px; color: #4b5563; }
-.export-summary-table td:nth-child(3) { text-align: center; font-weight: 500; }
+.summary-cell { background: #ffffff; }
+.summary-dow {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.summary-time {
+  color: #1f2937;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: keep-all;
+}
+.summary-empty { color: #9ca3af; }

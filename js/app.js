@@ -86,14 +86,51 @@ $('#file-image').addEventListener('change', async (e) => {
         prog.textContent = m.status;
       }
     });
-    out.textContent = text;
+    out.value = text;
     const parsed = parseFreeText(text);
-    prog.textContent = `완료. ${parsed.sessions.length}건 추출. 미리보기에서 보정 후 확정하세요.`;
-    showPreview(parsed);
+    if (parsed.sessions.length) {
+      prog.textContent = `완료. ${parsed.sessions.length}건 추출. 미리보기에서 보정 후 확정하세요.`;
+      showPreview(parsed);
+    } else {
+      prog.textContent = '완료. 자동 추출된 일정이 없습니다. 위 텍스트에서 형식을 맞춘 뒤 [텍스트에서 추출]을 누르세요.';
+    }
   } catch (err) {
     prog.textContent = 'OCR 오류: ' + err.message;
   }
   e.target.value = '';
+});
+
+$('#btn-ocr-parse').addEventListener('click', () => {
+  const text = $('#ocr-text').value;
+  if (!text.trim()) { alert('텍스트가 비어 있습니다.'); return; }
+  const parsed = parseFreeText(text);
+  if (!parsed.sessions.length) {
+    alert('일정을 찾지 못했습니다. 형식 예시:\n\n2026-05-04\n김민수 09:00\n박지영 10:30');
+    return;
+  }
+  showPreview(parsed);
+});
+
+$('#btn-sample-csv').addEventListener('click', () => {
+  const today = new Date();
+  const t1 = ymd(today);
+  const t2 = ymd(new Date(today.getTime() + 1 * 86400000));
+  const t3 = ymd(new Date(today.getTime() + 2 * 86400000));
+  const lines = [
+    'member_name,date,start_time,duration_min',
+    `김민수,${t1},09:00,50`,
+    `박지영,${t1},10:30,50`,
+    `이도윤,${t2},18:00,50`,
+    `김민수,${t3},09:00,50`,
+  ];
+  // UTF-8 BOM so Excel opens Korean correctly
+  const csv = '﻿' + lines.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'pt_schedule_sample.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
 });
 
 // ---------- preview ----------
