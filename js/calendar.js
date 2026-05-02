@@ -3,11 +3,10 @@ const DEFAULT_START = 6;
 const DEFAULT_END = 22; // exclusive
 
 const pad = n => String(n).padStart(2, '0');
-const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+export const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+export const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 
-// Monday-anchored start of week.
-const startOfWeek = (d) => {
+export const startOfWeek = (d) => {
   const x = new Date(d);
   const day = x.getDay();          // 0=Sun .. 6=Sat
   const offset = (day + 6) % 7;    // Mon→0, Tue→1, ..., Sun→6
@@ -16,12 +15,20 @@ const startOfWeek = (d) => {
   return x;
 };
 
+export function computeEndTime(startTime, durationMin) {
+  const [h, m] = startTime.split(':').map(Number);
+  const total = h * 60 + m + (durationMin || 0);
+  const eh = Math.floor(total / 60) % 24;
+  const em = total % 60;
+  return pad(eh) + ':' + pad(em);
+}
+
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
 ));
 
-// fitToSessions: when true, trim empty hours so PM-only members get a compact view.
-export function renderWeek(container, anchor, sessions, members, fitToSessions = false) {
+export function renderWeek(container, anchor, sessions, members, fitToSessions = false, opts = {}) {
+  const { hideMemberName = false, exportMode = false } = opts;
   const start = startOfWeek(anchor);
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i)); // Mon..Sun
   const today = ymd(new Date());
@@ -37,7 +44,7 @@ export function renderWeek(container, anchor, sessions, members, fitToSessions =
     const minH = Math.min(...startHours);
     const maxH = Math.max(...startHours);
     hStart = Math.max(0, minH - 1);
-    hEnd = Math.min(24, maxH + 2); // +1 buffer + lesson length
+    hEnd = Math.min(24, maxH + 2);
   }
 
   const showAM = hStart < 12;
@@ -47,7 +54,8 @@ export function renderWeek(container, anchor, sessions, members, fitToSessions =
   const pmStart = Math.max(12, hStart);
   const pmEnd = hEnd;
 
-  let html = '<div class="week-grid">';
+  const gridClass = 'week-grid' + (hideMemberName ? ' time-only' : '');
+  let html = `<div class="${gridClass}">`;
   html += '<div class="head"></div>';
   for (const d of days) {
     const cls = ymd(d) === today ? 'head today' : 'head';
@@ -56,23 +64,22 @@ export function renderWeek(container, anchor, sessions, members, fitToSessions =
 
   if (showAM) {
     html += `<div class="period-divider">오전 (AM)</div>`;
-    html += renderHourRows(amStart, amEnd, days, sessions, memberMap);
+    html += renderHourRows(amStart, amEnd, days, sessions, memberMap, hideMemberName);
   }
   if (showPM) {
     html += `<div class="period-divider">오후 (PM)</div>`;
-    html += renderHourRows(pmStart, pmEnd, days, sessions, memberMap);
+    html += renderHourRows(pmStart, pmEnd, days, sessions, memberMap, hideMemberName);
   }
 
   html += '</div>';
   container.innerHTML = html;
 
-  // Now-line on the current week
-  appendNowLine(container, days);
+  if (!exportMode) appendNowLine(container, days);
 
   return `${start.getFullYear()}년 ${start.getMonth() + 1}월 ${start.getDate()}일 주`;
 }
 
-function renderHourRows(hFrom, hTo, days, sessions, memberMap) {
+function renderHourRows(hFrom, hTo, days, sessions, memberMap, hideMemberName) {
   let html = '';
   for (let h = hFrom; h < hTo; h++) {
     html += `<div class="hour-label" data-hour="${h}">${pad(h)}:00</div>`;
@@ -85,7 +92,10 @@ function renderHourRows(hFrom, hTo, days, sessions, memberMap) {
           const m = memberMap[s.memberId];
           const color = m?.color || '#6b7280';
           const name = m?.name || '?';
-          return `<span class="event" style="background:${color}">${escapeHtml(s.startTime)} ${escapeHtml(name)}</span>`;
+          const label = hideMemberName
+            ? `${escapeHtml(s.startTime)}~${escapeHtml(computeEndTime(s.startTime, s.durationMin))}`
+            : `${escapeHtml(s.startTime)} ${escapeHtml(name)}`;
+          return `<span class="event" style="background:${color}">${label}</span>`;
         }).join('');
       html += `<div class="cell">${items}</div>`;
     }
@@ -100,7 +110,7 @@ function appendNowLine(container, days) {
   const now = new Date();
   const todayStr = ymd(now);
   const dayIdx = days.findIndex(d => ymd(d) === todayStr);
-  if (dayIdx < 0) return; // not in current week
+  if (dayIdx < 0) return;
 
   const h = now.getHours();
   const m = now.getMinutes();
@@ -128,14 +138,16 @@ function appendNowLine(container, days) {
   grid.appendChild(line);
 }
 
-export function renderMonth(container, anchor, sessions, members) {
+export function renderMonth(container, anchor, sessions, members, opts = {}) {
+  const { hideMemberName = false } = opts;
   const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
   const gridStart = addDays(first, -first.getDay());
   const days = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
   const today = ymd(new Date());
   const memberMap = Object.fromEntries(members.map(m => [m.id, m]));
 
-  let html = '<div class="month-grid">';
+  const gridClass = 'month-grid' + (hideMemberName ? ' time-only' : '');
+  let html = `<div class="${gridClass}">`;
   for (const name of DOW_KR) html += `<div class="day-head">${name}</div>`;
   for (const d of days) {
     const dStr = ymd(d);
@@ -149,7 +161,10 @@ export function renderMonth(container, anchor, sessions, members) {
         const m = memberMap[s.memberId];
         const color = m?.color || '#6b7280';
         const name = m?.name || '?';
-        return `<span class="ev" style="background:${color}">${escapeHtml(s.startTime)} ${escapeHtml(name)}</span>`;
+        const label = hideMemberName
+          ? `${escapeHtml(s.startTime)}~${escapeHtml(computeEndTime(s.startTime, s.durationMin))}`
+          : `${escapeHtml(s.startTime)} ${escapeHtml(name)}`;
+        return `<span class="ev" style="background:${color}">${label}</span>`;
       }).join('');
     html += `<div class="${cls}"><span class="day-num">${d.getDate()}</span>${evs}</div>`;
   }

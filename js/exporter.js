@@ -1,11 +1,97 @@
-// Renders a DOM node to JPG and triggers download.
-export async function exportJPG(node, filename) {
-  document.body.classList.add('exporting');
+import { renderWeek, renderMonth, startOfWeek, addDays, ymd, computeEndTime } from './calendar.js';
+
+const DOW_KR = ['일', '월', '화', '수', '목', '금', '토'];
+
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+));
+
+function formatPeriod(anchor, mode) {
+  if (mode === 'week') {
+    const s = startOfWeek(anchor);
+    const e = addDays(s, 6);
+    const sameYear = s.getFullYear() === e.getFullYear();
+    const sameMonth = sameYear && s.getMonth() === e.getMonth();
+    const left = `${s.getFullYear()}년 ${s.getMonth() + 1}월 ${s.getDate()}일(월)`;
+    const right = sameMonth
+      ? `${e.getDate()}일(일)`
+      : (sameYear ? `${e.getMonth() + 1}월 ${e.getDate()}일(일)` : `${e.getFullYear()}년 ${e.getMonth() + 1}월 ${e.getDate()}일(일)`);
+    return `${left} ~ ${right}`;
+  }
+  return `${anchor.getFullYear()}년 ${anchor.getMonth() + 1}월`;
+}
+
+function buildWeekSummary(start, sessions) {
+  const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
+  let html = `<div class="export-summary">
+    <h3>스케줄 요약</h3>
+    <table class="export-summary-table">
+      <thead><tr><th>요일</th><th>날짜</th><th>수업 시간</th></tr></thead>
+      <tbody>`;
+  for (const d of days) {
+    const dStr = ymd(d);
+    const list = sessions
+      .filter(s => s.date === dStr)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime))
+      .map(s => `${s.startTime}~${computeEndTime(s.startTime, s.durationMin)}`)
+      .join(', ');
+    html += `<tr>
+      <td>${DOW_KR[d.getDay()]}</td>
+      <td>${d.getMonth() + 1}/${d.getDate()}</td>
+      <td>${escapeHtml(list || '-')}</td>
+    </tr>`;
+  }
+  html += `</tbody></table></div>`;
+  return html;
+}
+
+export async function exportSchedule({ member, anchor, mode, sessions, members, filename }) {
+  const filtered = member ? sessions.filter(s => s.memberId === member.id) : sessions;
+  const title = member ? `${member.name}님 PT 스케줄` : '전체 PT 스케줄';
+
+  const node = document.createElement('div');
+  node.className = 'export-card';
+  Object.assign(node.style, {
+    position: 'absolute',
+    left: '-10000px',
+    top: '0',
+    width: '900px',
+    background: '#ffffff',
+  });
+
+  node.innerHTML = `
+    <div class="export-header">
+      <h2 class="export-title">${escapeHtml(title)}</h2>
+      <p class="export-period">${escapeHtml(formatPeriod(anchor, mode))}</p>
+    </div>
+    <div class="export-calendar"></div>
+  `;
+
+  const calContainer = node.querySelector('.export-calendar');
+  if (mode === 'week') {
+    renderWeek(calContainer, anchor, filtered, members, !!member, {
+      hideMemberName: !!member,
+      exportMode: true,
+    });
+  } else {
+    renderMonth(calContainer, anchor, filtered, members, {
+      hideMemberName: !!member,
+    });
+  }
+
+  if (member && mode === 'week') {
+    node.insertAdjacentHTML('beforeend', buildWeekSummary(startOfWeek(anchor), filtered));
+  }
+
+  document.body.appendChild(node);
   try {
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    await new Promise(r => requestAnimationFrame(r));
+
     const canvas = await html2canvas(node, {
       backgroundColor: '#ffffff',
       scale: 2,
-      useCORS: true
+      useCORS: true,
     });
     const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
     const a = document.createElement('a');
@@ -15,6 +101,6 @@ export async function exportJPG(node, filename) {
     a.click();
     a.remove();
   } finally {
-    document.body.classList.remove('exporting');
+    node.remove();
   }
 }

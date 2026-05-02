@@ -2,7 +2,7 @@ import { Store } from './store.js';
 import { parseCSV, parseXLSX, parseFreeText } from './parser.js';
 import { ocrImage } from './ocr.js';
 import { renderWeek, renderMonth } from './calendar.js';
-import { exportJPG } from './exporter.js';
+import { exportSchedule } from './exporter.js';
 
 const state = {
   view: 'calendar',
@@ -254,11 +254,17 @@ $('#member-filter').addEventListener('change', (e) => {
 });
 
 $('#btn-export').addEventListener('click', async () => {
-  const node = $('#view-calendar');
   const member = state.filter ? Store.members().find(m => m.id === state.filter) : null;
   const tag = member ? member.name : 'all';
   const fname = `${tag}_${ymd(state.anchor)}_${state.mode}.jpg`;
-  await exportJPG(node, fname);
+  await exportSchedule({
+    member,
+    anchor: state.anchor,
+    mode: state.mode,
+    sessions: Store.sessions(),
+    members: Store.members(),
+    filename: fname,
+  });
 });
 
 $('#btn-export-all').addEventListener('click', async () => {
@@ -266,19 +272,19 @@ $('#btn-export-all').addEventListener('click', async () => {
   if (!ms.length) { alert('회원이 없습니다.'); return; }
   if (!confirm(`${ms.length}명의 회원 캘린더를 각각 JPG로 저장합니다. 브라우저가 다중 다운로드를 묻거나 차단할 수 있습니다. 계속할까요?`)) return;
 
-  const sel = $('#member-filter');
-  const prevFilter = state.filter;
+  const sessions = Store.sessions();
+  const members = Store.members();
   for (const m of ms) {
-    state.filter = m.id;
-    sel.value = m.id;
-    renderCalendar();
-    await new Promise(r => setTimeout(r, 150));
-    await exportJPG($('#view-calendar'), `${m.name}_${ymd(state.anchor)}_${state.mode}.jpg`);
+    await exportSchedule({
+      member: m,
+      anchor: state.anchor,
+      mode: state.mode,
+      sessions,
+      members,
+      filename: `${m.name}_${ymd(state.anchor)}_${state.mode}.jpg`,
+    });
     await new Promise(r => setTimeout(r, 250));
   }
-  state.filter = prevFilter;
-  sel.value = prevFilter;
-  renderCalendar();
   flash('일괄 저장 완료');
 });
 

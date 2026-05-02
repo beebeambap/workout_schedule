@@ -205,3 +205,70 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px; }
 
 /* Print/export friendly */
 .exporting .toolbar { display: none !important; }
+
+/* JPG export layout (offscreen) */
+.export-card {
+  width: 900px;
+  padding: 32px;
+  background: #ffffff;
+  font-family: 'Noto Sans KR', system-ui, sans-serif;
+  color: #111827;
+  box-sizing: border-box;
+}
+.export-header {
+  text-align: center;
+  margin: 0 0 20px;
+}
+.export-title {
+  margin: 0 0 6px;
+  font-size: 26px;
+  font-weight: 700;
+}
+.export-period {
+  margin: 0;
+  color: #4b5563;
+  font-size: 14px;
+}
+
+/* Calendar inside export wrapper: tighter borders, centered cells */
+.export-card .week-grid,
+.export-card .month-grid {
+  border: 1px solid #d1d5db;
+}
+.export-card .hour-label {
+  text-align: center;
+  font-weight: 600;
+}
+.export-card .week-grid.time-only .event,
+.export-card .month-grid.time-only .ev {
+  text-align: center;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+}
+
+/* Schedule summary table */
+.export-summary { margin-top: 24px; }
+.export-summary h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.export-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.export-summary-table th,
+.export-summary-table td {
+  border: 1px solid #d1d5db;
+  padding: 8px;
+  text-align: center;
+}
+.export-summary-table th {
+  background: #f3f4f6;
+  font-weight: 700;
+}
+.export-summary-table td:nth-child(1) { width: 80px; }
+.export-summary-table td:nth-child(2) { width: 120px; color: #4b5563; }
+.export-summary-table td:nth-child(3) { text-align: center; font-weight: 500; }
