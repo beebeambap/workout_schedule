@@ -518,7 +518,12 @@ $('#btn-profile').addEventListener('click', () => {
   $('#modal-profile').showModal();
 });
 
+let pfSaveBusy = false;
 $('#pf-save').onclick = async () => {
+  if (pfSaveBusy) return;
+  pfSaveBusy = true;
+  const btn = $('#pf-save');
+  btn.disabled = true;
   const nick = $('#pf-nickname').value.trim();
   try {
     const user = await updateUserMetadata({ nickname: nick });
@@ -528,6 +533,9 @@ $('#pf-save').onclick = async () => {
     flash('저장되었습니다.');
   } catch (err) {
     alert('저장 오류: ' + err.message);
+  } finally {
+    pfSaveBusy = false;
+    btn.disabled = false;
   }
 };
 

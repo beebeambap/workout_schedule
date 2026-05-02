@@ -27,9 +27,16 @@ export async function signOut() {
 
 export async function updateUserMetadata(data) {
   if (!sb) throw new Error('Supabase가 설정되지 않았습니다.');
-  const { data: result, error } = await sb.auth.updateUser({ data });
-  if (error) throw error;
-  return result.user;
+  // Single retry for transient auth-lock contention
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { data: result, error } = await sb.auth.updateUser({ data });
+    if (!error) return result.user;
+    if (attempt === 0 && /lock .* was released|stole it/i.test(error.message || '')) {
+      await new Promise(r => setTimeout(r, 150));
+      continue;
+    }
+    throw error;
+  }
 }
 
 export function onAuthChange(cb) {
