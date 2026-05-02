@@ -2,6 +2,8 @@ import { Store } from './store.js';
 import { parseCSV, parseXLSX } from './parser.js';
 import { renderWeek, renderMonth, computeEndTime } from './calendar.js';
 import { exportSchedule } from './exporter.js';
+import { sbReady } from './supabase.js';
+import { getSession, sendMagicLink, signOut, onAuthChange } from './auth.js';
 
 const state = {
   view: 'calendar',
@@ -149,16 +151,20 @@ function renderPreviewTable(warnings) {
   });
 }
 
-$('#btn-confirm').addEventListener('click', () => {
+$('#btn-confirm').addEventListener('click', async () => {
   if (!state.pending || !state.pending.length) {
     alert('확정할 항목이 없습니다.');
     return;
   }
-  commitSessions(state.pending);
-  state.pending = null;
-  $('#preview').classList.add('hidden');
-  flash('확정되었습니다.');
-  switchView('calendar');
+  try {
+    await commitSessions(state.pending);
+    state.pending = null;
+    $('#preview').classList.add('hidden');
+    flash('확정되었습니다.');
+    switchView('calendar');
+  } catch (err) {
+    alert('저장 오류: ' + err.message);
+  }
 });
 
 $('#btn-cancel').addEventListener('click', () => {
@@ -166,32 +172,35 @@ $('#btn-cancel').addEventListener('click', () => {
   $('#preview').classList.add('hidden');
 });
 
-function commitSessions(arr) {
-  const enriched = arr.filter(s => s.name && s.date && s.startTime).map(s => {
-    const m = Store.ensureMember(s.name);
-    return {
+async function commitSessions(arr) {
+  const valid = arr.filter(s => s.name && s.date && s.startTime);
+  // Resolve members first (insert any new ones), then bulk-insert sessions.
+  const enriched = [];
+  for (const s of valid) {
+    const m = await Store.ensureMember(s.name);
+    enriched.push({
       memberId: m.id,
       date: s.date,
       startTime: s.startTime,
-      durationMin: parseInt(s.durationMin, 10) || 50
-    };
-  });
-  Store.addSessions(enriched);
-  refreshFilter();
-  if (state.view === 'calendar') renderCalendar();
+      durationMin: parseInt(s.durationMin, 10) || 50,
+    });
+  }
+  await Store.addSessions(enriched);
 }
 
 // ---------- members ----------
-$('#form-member').addEventListener('submit', (e) => {
+$('#form-member').addEventListener('submit', async (e) => {
   e.preventDefault();
   const fd = new FormData(e.target);
   const name = String(fd.get('name')).trim();
   if (!name) return;
-  Store.ensureMember(name, fd.get('color'), String(fd.get('memo') || '').trim());
-  e.target.reset();
-  e.target.elements.color.value = '#3b82f6';
-  renderMembers();
-  refreshFilter();
+  try {
+    await Store.ensureMember(name, fd.get('color'), String(fd.get('memo') || '').trim());
+    e.target.reset();
+    e.target.elements.color.value = '#3b82f6';
+  } catch (err) {
+    alert('저장 오류: ' + err.message);
+  }
 });
 
 function renderMembers() {
@@ -339,12 +348,15 @@ function openSessionModal(sessionId) {
     ${memoLine}
   `;
 
-  $('#ms-delete').onclick = () => {
+  $('#ms-delete').onclick = async () => {
     if (!confirm('이 수업을 삭제할까요?')) return;
-    Store.removeSession(s.id);
-    $('#modal-session').close();
-    renderCalendar();
-    flash('수업이 삭제되었습니다.');
+    try {
+      await Store.removeSession(s.id);
+      $('#modal-session').close();
+      flash('수업이 삭제되었습니다.');
+    } catch (err) {
+      alert('삭제 오류: ' + err.message);
+    }
   };
   $('#ms-edit-member').onclick = () => {
     $('#modal-session').close();
@@ -363,30 +375,28 @@ function openMemberModal(memberId) {
   const cnt = Store.countByMember()[m.id] || 0;
   $('#mm-stats').textContent = `등록된 수업 ${cnt}건`;
 
-  $('#mm-save').onclick = () => {
+  $('#mm-save').onclick = async () => {
     try {
-      Store.updateMember(m.id, {
+      await Store.updateMember(m.id, {
         name: $('#mm-name').value,
         color: $('#mm-color').value,
         memo: $('#mm-memo').value,
       });
       $('#modal-member').close();
-      renderMembers();
-      refreshFilter();
-      renderCalendar();
       flash('저장되었습니다.');
     } catch (err) {
       alert(err.message);
     }
   };
-  $('#mm-delete').onclick = () => {
+  $('#mm-delete').onclick = async () => {
     if (!confirm(`${m.name} 회원과 모든 수업을 삭제할까요?`)) return;
-    Store.removeMember(m.id);
-    $('#modal-member').close();
-    renderMembers();
-    refreshFilter();
-    renderCalendar();
-    flash('삭제되었습니다.');
+    try {
+      await Store.removeMember(m.id);
+      $('#modal-member').close();
+      flash('삭제되었습니다.');
+    } catch (err) {
+      alert('삭제 오류: ' + err.message);
+    }
   };
 
   $('#modal-member').showModal();
@@ -417,19 +427,123 @@ function flash(msg) {
   flashTimer = setTimeout(() => { n.style.opacity = '0'; }, 1800);
 }
 
-// ---------- init ----------
+// ---------- auth + bootstrap ----------
+function show(id) { document.getElementById(id).hidden = false; }
+function hide(id) { document.getElementById(id).hidden = true; }
+
 function pinToday() {
-  // Lock typing form date to current real date on load
   const dateInput = $('#form-typing input[name="date"]');
   if (dateInput && !dateInput.value) dateInput.value = ymd(new Date());
-  // Anchor calendar to today (real-time)
   state.anchor = new Date();
 }
 
-pinToday();
-refreshFilter();
-renderCalendar();
-renderMembers();
+function showAuthScreen() {
+  hide('app-topbar');
+  hide('app-main');
+  show('auth-screen');
+}
+function showApp(session) {
+  hide('auth-screen');
+  show('app-topbar');
+  show('app-main');
+  $('#account-email').textContent = session?.user?.email || '';
+}
+
+async function maybeMigrateLocal() {
+  const oldM = localStorage.getItem('pt_members');
+  const oldS = localStorage.getItem('pt_sessions');
+  if (!oldM && !oldS) return;
+  const choice = confirm(
+    '브라우저에 저장된 이전 로컬 데이터가 있습니다.\n\n' +
+    '확인: 클라우드 계정으로 옮깁니다.\n' +
+    '취소: 그대로 두고 다음에 다시 묻습니다.'
+  );
+  if (!choice) return;
+  try {
+    const oldMembers = JSON.parse(oldM || '[]');
+    const oldSessions = JSON.parse(oldS || '[]');
+    const idMap = {};
+    for (const om of oldMembers) {
+      const m = await Store.ensureMember(om.name, om.color, om.memo || '');
+      idMap[om.id] = m.id;
+    }
+    const newSessions = oldSessions
+      .filter(s => idMap[s.memberId])
+      .map(s => ({
+        memberId: idMap[s.memberId],
+        date: s.date,
+        startTime: s.startTime,
+        durationMin: s.durationMin,
+      }));
+    if (newSessions.length) await Store.addSessions(newSessions);
+    localStorage.removeItem('pt_members');
+    localStorage.removeItem('pt_sessions');
+    flash(`이전 완료: 회원 ${oldMembers.length}명, 수업 ${newSessions.length}건`);
+  } catch (err) {
+    alert('이전 중 오류: ' + err.message + '\n로컬 데이터는 보존되었습니다.');
+  }
+}
+
+async function onSignedIn(session) {
+  showApp(session);
+  pinToday();
+  Store.onUpdate(() => {
+    refreshFilter();
+    if (state.view === 'calendar') renderCalendar();
+    if (state.view === 'members') renderMembers();
+  });
+  try {
+    await Store.init();
+  } catch (err) {
+    alert('데이터 로드 오류: ' + err.message);
+    return;
+  }
+  await maybeMigrateLocal();
+  refreshFilter();
+  renderCalendar();
+  renderMembers();
+}
+
+async function onSignedOut() {
+  await Store.teardown();
+  showAuthScreen();
+}
+
+// Magic link form
+$('#form-magic').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = $('#auth-email').value.trim();
+  if (!email) return;
+  const status = $('#auth-status');
+  status.textContent = '전송 중...';
+  try {
+    await sendMagicLink(email);
+    status.textContent = `${email} 으로 로그인 링크를 보냈습니다. 이메일에서 링크를 클릭하면 자동으로 로그인됩니다.`;
+  } catch (err) {
+    status.textContent = '오류: ' + err.message;
+  }
+});
+
+$('#btn-signout').addEventListener('click', async () => {
+  if (!confirm('로그아웃 하시겠습니까?')) return;
+  await signOut();
+});
+
+async function bootstrap() {
+  if (!sbReady) {
+    show('config-screen');
+    return;
+  }
+  const session = await getSession();
+  if (session) await onSignedIn(session);
+  else showAuthScreen();
+  onAuthChange(async (newSession) => {
+    if (newSession) await onSignedIn(newSession);
+    else await onSignedOut();
+  });
+}
+
+bootstrap();
 
 // Refresh week view every minute so the red "now" line tracks current time.
 setInterval(() => {
