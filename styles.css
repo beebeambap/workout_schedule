@@ -104,22 +104,46 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px; }
 }
 .wg-event {
   position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   border-radius: 4px;
   padding: 2px 5px;
   color: #fff;
-  font-size: 11px;
-  line-height: 1.2;
+  line-height: 1.15;
+  overflow: hidden;
+  box-sizing: border-box;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+}
+.wg-event:hover { filter: brightness(1.05); }
+.wg-event .ev-name {
+  font-weight: 700;
+  font-size: 12px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  box-sizing: border-box;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.wg-event .ev-time {
+  font-size: 10px;
+  opacity: 0.9;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .wg-time-only .wg-event {
   text-align: center;
   font-weight: 600;
   font-size: 12px;
 }
+.wg-time-only .wg-event .ev-time {
+  font-size: 12px;
+  opacity: 1;
+  text-align: center;
+}
+
+.month-grid .ev { cursor: pointer; }
+.month-grid .ev:hover { filter: brightness(1.05); }
 .wg-now-line {
   position: absolute;
   left: 60px; right: 0;
@@ -224,15 +248,30 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px; }
 
 .member-list { list-style: none; padding: 0; margin-top: 16px; }
 .member-list li {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px; border-bottom: 1px solid #e5e7eb; background: #fff;
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px; border-bottom: 1px solid #e5e7eb; background: #fff;
+  cursor: pointer;
 }
-.swatch { width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0; }
-.member-list .count { color: #6b7280; font-size: 12px; margin-left: 6px; }
-.member-list button {
-  margin-left: auto; background: #fee2e2; color: #991b1b;
-  border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font: inherit;
+.member-list li:hover { background: #f9fafb; }
+.member-list li.ml-empty { cursor: default; color: #6b7280; }
+.swatch {
+  width: 16px; height: 16px; border-radius: 50%;
+  flex-shrink: 0; display: inline-block; margin-top: 3px;
 }
+.member-list .ml-info { flex: 1; min-width: 0; }
+.member-list .ml-row1 { display: flex; align-items: center; gap: 8px; }
+.member-list .ml-name { font-weight: 600; }
+.member-list .count { color: #6b7280; font-size: 12px; }
+.member-list .ml-memo {
+  color: #4b5563; font-size: 12px; margin-top: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.member-list button.ml-edit {
+  margin-left: auto; background: #fff; color: #111827;
+  border: 1px solid #d1d5db; padding: 6px 12px;
+  border-radius: 4px; cursor: pointer; font: inherit;
+}
+.member-list button.ml-edit:hover { background: #f9fafb; }
 
 .ocr-progress { margin: 8px 0; font-size: 13px; color: #2563eb; }
 textarea.ocr-text {
@@ -342,3 +381,81 @@ textarea.ocr-text {
   word-break: keep-all;
 }
 .summary-empty { color: #9ca3af; }
+
+/* Modals (HTML <dialog>) */
+.modal {
+  border: none;
+  border-radius: 12px;
+  padding: 0;
+  max-width: 92vw;
+  width: 440px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+.modal::backdrop { background: rgba(15, 23, 42, 0.5); }
+.modal-content { padding: 22px; position: relative; }
+.modal-content h3 { margin: 0 0 12px; font-size: 18px; }
+.modal-close {
+  position: absolute; top: 10px; right: 10px;
+  background: none; border: none; font-size: 22px; line-height: 1;
+  cursor: pointer; color: #6b7280; padding: 4px 8px; border-radius: 4px;
+}
+.modal-close:hover { background: #f3f4f6; }
+.modal-body {
+  display: flex; flex-direction: column; gap: 12px;
+  margin: 8px 0 16px;
+}
+.modal-body label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.modal-body input,
+.modal-body textarea {
+  padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px;
+  font: inherit; background: #fff; box-sizing: border-box;
+}
+.modal-body textarea { resize: vertical; min-height: 80px; }
+.modal-row {
+  display: grid; grid-template-columns: 70px 1fr; gap: 8px;
+  font-size: 14px; align-items: start;
+}
+.modal-row .modal-label { color: #6b7280; font-size: 13px; padding-top: 2px; }
+.modal-row .modal-value { color: #111827; word-break: break-word; }
+
+.modal-actions {
+  display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap;
+  margin-top: 8px;
+}
+.modal-actions button {
+  padding: 8px 14px; border: 1px solid #d1d5db; border-radius: 6px;
+  background: #fff; cursor: pointer; font: inherit;
+}
+.modal-actions button.primary { background: #111827; color: #fff; border-color: #111827; }
+.modal-actions button.primary:hover { background: #1f2937; }
+.modal-actions button.danger { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+.modal-actions button.danger:hover { background: #fecaca; }
+
+/* Mobile responsive — make week grid usable on small screens */
+@media (max-width: 640px) {
+  main { padding: 12px; }
+  .topbar h1 { font-size: 15px; }
+  .topbar nav button { padding: 6px 8px; font-size: 13px; }
+
+  .toolbar { gap: 6px; }
+  #period-label { min-width: 0; font-size: 13px; }
+  .toolbar button, .toolbar select { padding: 5px 8px; font-size: 13px; }
+
+  .calendar-canvas { padding: 6px; }
+  .wg-header, .wg-body {
+    grid-template-columns: 36px repeat(7, 1fr);
+  }
+  .wg-now-line { left: 36px; }
+  .wg-day-head { font-size: 11px; padding: 6px 2px; letter-spacing: -0.3px; }
+  .wg-hour-label { font-size: 10px; }
+  .wg-event { padding: 1px 3px; }
+  .wg-event .ev-name { font-size: 11px; font-weight: 700; }
+  .wg-event .ev-time { font-size: 9px; }
+
+  .month-grid .day { min-height: 64px; }
+  .month-grid .ev { font-size: 10px; padding: 1px 3px; }
+
+  .grid-form { grid-template-columns: 1fr; }
+  .modal { width: auto; }
+  .modal-row { grid-template-columns: 60px 1fr; }
+}

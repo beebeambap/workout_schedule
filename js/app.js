@@ -1,7 +1,6 @@
 import { Store } from './store.js';
-import { parseCSV, parseXLSX, parseFreeText } from './parser.js';
-import { ocrImage } from './ocr.js';
-import { renderWeek, renderMonth } from './calendar.js';
+import { parseCSV, parseXLSX } from './parser.js';
+import { renderWeek, renderMonth, computeEndTime } from './calendar.js';
 import { exportSchedule } from './exporter.js';
 
 const state = {
@@ -73,44 +72,6 @@ $('#file-xlsx').addEventListener('change', async (e) => {
   e.target.value = '';
 });
 
-$('#file-image').addEventListener('change', async (e) => {
-  const f = e.target.files[0]; if (!f) return;
-  const prog = $('#ocr-progress');
-  const out = $('#ocr-text');
-  prog.textContent = 'OCR 준비중... (최초 실행은 한국어 데이터 다운로드로 시간이 걸릴 수 있습니다)';
-  try {
-    const text = await ocrImage(f, (m) => {
-      if (m.status === 'recognizing text') {
-        prog.textContent = `인식중 ${(m.progress * 100).toFixed(0)}%`;
-      } else if (m.status) {
-        prog.textContent = m.status;
-      }
-    });
-    out.value = text;
-    const parsed = parseFreeText(text);
-    if (parsed.sessions.length) {
-      prog.textContent = `완료. ${parsed.sessions.length}건 추출. 미리보기에서 보정 후 확정하세요.`;
-      showPreview(parsed);
-    } else {
-      prog.textContent = '완료. 자동 추출된 일정이 없습니다. 위 텍스트에서 형식을 맞춘 뒤 [텍스트에서 추출]을 누르세요.';
-    }
-  } catch (err) {
-    prog.textContent = 'OCR 오류: ' + err.message;
-  }
-  e.target.value = '';
-});
-
-$('#btn-ocr-parse').addEventListener('click', () => {
-  const text = $('#ocr-text').value;
-  if (!text.trim()) { alert('텍스트가 비어 있습니다.'); return; }
-  const parsed = parseFreeText(text);
-  if (!parsed.sessions.length) {
-    alert('일정을 찾지 못했습니다. 형식 예시:\n\n2026-05-04\n김민수 09:00\n박지영 10:30');
-    return;
-  }
-  showPreview(parsed);
-});
-
 $('#btn-sample-csv').addEventListener('click', () => {
   const today = new Date();
   const t1 = ymd(today);
@@ -175,7 +136,7 @@ function renderPreviewTable(warnings) {
       const idx = parseInt(tr.dataset.idx, 10);
       const k = e.target.dataset.k;
       let v = e.target.value;
-      if (k === 'durationMin') v = parseInt(v, 10) || 60;
+      if (k === 'durationMin') v = parseInt(v, 10) || 50;
       state.pending[idx][k] = v;
     });
   });
@@ -212,7 +173,7 @@ function commitSessions(arr) {
       memberId: m.id,
       date: s.date,
       startTime: s.startTime,
-      durationMin: parseInt(s.durationMin, 10) || 60
+      durationMin: parseInt(s.durationMin, 10) || 50
     };
   });
   Store.addSessions(enriched);
@@ -226,8 +187,9 @@ $('#form-member').addEventListener('submit', (e) => {
   const fd = new FormData(e.target);
   const name = String(fd.get('name')).trim();
   if (!name) return;
-  Store.ensureMember(name, fd.get('color'));
+  Store.ensureMember(name, fd.get('color'), String(fd.get('memo') || '').trim());
   e.target.reset();
+  e.target.elements.color.value = '#3b82f6';
   renderMembers();
   refreshFilter();
 });
@@ -237,26 +199,28 @@ function renderMembers() {
   const ms = Store.members();
   const counts = Store.countByMember();
   if (!ms.length) {
-    ul.innerHTML = '<li>등록된 회원이 없습니다. 가져오기에서 일정을 등록하면 자동으로 생성됩니다.</li>';
+    ul.innerHTML = '<li class="ml-empty">등록된 회원이 없습니다. 가져오기에서 일정을 등록하면 자동으로 생성됩니다.</li>';
     return;
   }
-  ul.innerHTML = ms.map(m =>
-    `<li>
+  ul.innerHTML = ms.map(m => {
+    const memoPreview = (m.memo || '').replace(/\s+/g, ' ').trim();
+    return `<li data-id="${m.id}">
       <span class="swatch" style="background:${m.color}"></span>
-      <span>${esc(m.name)}</span>
-      <span class="count">수업 ${counts[m.id] || 0}건</span>
-      <button data-id="${m.id}">삭제</button>
-    </li>`
-  ).join('');
-  ul.querySelectorAll('button').forEach(b => {
-    b.addEventListener('click', () => {
-      if (confirm('회원과 모든 수업을 삭제할까요?')) {
-        Store.removeMember(b.dataset.id);
-        renderMembers();
-        refreshFilter();
-        if (state.view === 'calendar') renderCalendar();
-      }
+      <div class="ml-info">
+        <div class="ml-row1"><span class="ml-name">${esc(m.name)}</span><span class="count">수업 ${counts[m.id] || 0}건</span></div>
+        ${memoPreview ? `<div class="ml-memo">${esc(memoPreview)}</div>` : ''}
+      </div>
+      <button class="ml-edit" data-id="${m.id}">편집</button>
+    </li>`;
+  }).join('');
+  ul.querySelectorAll('.ml-edit').forEach(b => {
+    b.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      openMemberModal(b.dataset.id);
     });
+  });
+  ul.querySelectorAll('li[data-id]').forEach(li => {
+    li.addEventListener('click', () => openMemberModal(li.dataset.id));
   });
 }
 
@@ -346,6 +310,92 @@ function renderCalendar() {
     : renderMonth(cont, state.anchor, sessions, members);
   $('#period-label').textContent = label;
 }
+
+// ---------- click on a calendar event opens session modal ----------
+$('#calendar').addEventListener('click', (ev) => {
+  const target = ev.target.closest('[data-session-id]');
+  if (!target) return;
+  const sid = target.dataset.sessionId;
+  if (sid) openSessionModal(sid);
+});
+
+function openSessionModal(sessionId) {
+  const s = Store.sessions().find(x => x.id === sessionId);
+  if (!s) return;
+  const m = Store.members().find(x => x.id === s.memberId);
+  if (!m) return;
+
+  const endTime = computeEndTime(s.startTime, s.durationMin);
+  $('#ms-title').textContent = `${m.name}님 수업`;
+  const memoLine = m.memo
+    ? `<div class="modal-row"><span class="modal-label">메모</span><span class="modal-value">${esc(m.memo)}</span></div>`
+    : '';
+  $('#ms-body').innerHTML = `
+    <div class="modal-row"><span class="modal-label">회원</span>
+      <span class="modal-value"><span class="swatch" style="background:${m.color}"></span> ${esc(m.name)}</span>
+    </div>
+    <div class="modal-row"><span class="modal-label">날짜</span><span class="modal-value">${esc(s.date)}</span></div>
+    <div class="modal-row"><span class="modal-label">시간</span><span class="modal-value">${esc(s.startTime)} ~ ${esc(endTime)} <span class="hint">(${s.durationMin}분)</span></span></div>
+    ${memoLine}
+  `;
+
+  $('#ms-delete').onclick = () => {
+    if (!confirm('이 수업을 삭제할까요?')) return;
+    Store.removeSession(s.id);
+    $('#modal-session').close();
+    renderCalendar();
+    flash('수업이 삭제되었습니다.');
+  };
+  $('#ms-edit-member').onclick = () => {
+    $('#modal-session').close();
+    openMemberModal(m.id);
+  };
+
+  $('#modal-session').showModal();
+}
+
+function openMemberModal(memberId) {
+  const m = Store.members().find(x => x.id === memberId);
+  if (!m) return;
+  $('#mm-name').value = m.name;
+  $('#mm-color').value = m.color;
+  $('#mm-memo').value = m.memo || '';
+  const cnt = Store.countByMember()[m.id] || 0;
+  $('#mm-stats').textContent = `등록된 수업 ${cnt}건`;
+
+  $('#mm-save').onclick = () => {
+    try {
+      Store.updateMember(m.id, {
+        name: $('#mm-name').value,
+        color: $('#mm-color').value,
+        memo: $('#mm-memo').value,
+      });
+      $('#modal-member').close();
+      renderMembers();
+      refreshFilter();
+      renderCalendar();
+      flash('저장되었습니다.');
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+  $('#mm-delete').onclick = () => {
+    if (!confirm(`${m.name} 회원과 모든 수업을 삭제할까요?`)) return;
+    Store.removeMember(m.id);
+    $('#modal-member').close();
+    renderMembers();
+    refreshFilter();
+    renderCalendar();
+    flash('삭제되었습니다.');
+  };
+
+  $('#modal-member').showModal();
+}
+
+// Generic modal close
+document.querySelectorAll('[data-close]').forEach(b => {
+  b.addEventListener('click', () => b.closest('dialog')?.close());
+});
 
 // ---------- toast ----------
 let flashTimer = null;

@@ -145,9 +145,10 @@ export function renderWeek(container, anchor, sessions, members, fitToSessions =
       const leftPct = e.laneIdx * widthPct;
       const endTime = computeEndTime(e.startTime, e.durationMin);
       const label = hideMemberName
-        ? `${escapeHtml(e.startTime)}~${escapeHtml(endTime)}`
-        : `${escapeHtml(e.startTime)} ${escapeHtml(name)}`;
-      html += `<div class="wg-event" style="top:${top}px;height:${height}px;left:calc(${leftPct}% + 1px);width:calc(${widthPct}% - 2px);background:${color}">${label}</div>`;
+        ? `<span class="ev-time">${escapeHtml(e.startTime)}~${escapeHtml(endTime)}</span>`
+        : `<span class="ev-name">${escapeHtml(name)}</span><span class="ev-time">${escapeHtml(e.startTime)}</span>`;
+      const sid = escapeHtml(e.id || '');
+      html += `<div class="wg-event" data-session-id="${sid}" style="top:${top}px;height:${height}px;left:calc(${leftPct}% + 1px);width:calc(${widthPct}% - 2px);background:${color}">${label}</div>`;
     }
 
     html += `</div>`;
@@ -217,8 +218,9 @@ export function renderMonth(container, anchor, sessions, members, opts = {}) {
         const name = m?.name || '?';
         const label = hideMemberName
           ? `${escapeHtml(s.startTime)}~${escapeHtml(computeEndTime(s.startTime, s.durationMin))}`
-          : `${escapeHtml(s.startTime)} ${escapeHtml(name)}`;
-        return `<span class="ev" style="background:${color}">${label}</span>`;
+          : `${escapeHtml(name)} ${escapeHtml(s.startTime)}`;
+        const sid = escapeHtml(s.id || '');
+        return `<span class="ev" data-session-id="${sid}" style="background:${color}">${label}</span>`;
       }).join('');
     html += `<div class="${cls}"><span class="day-num">${d.getDate()}</span>${evs}</div>`;
   }

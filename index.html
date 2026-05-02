@@ -11,7 +11,6 @@
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
 </head>
 <body>
 <header class="topbar">
@@ -52,7 +51,6 @@
       <button data-tab="typing" class="active">타이핑</button>
       <button data-tab="csv">CSV</button>
       <button data-tab="xlsx" hidden>Excel</button>
-      <button data-tab="image">이미지(OCR)</button>
     </div>
 
     <div id="tab-typing" class="tab active">
@@ -78,26 +76,6 @@
       <input type="file" id="file-xlsx" accept=".xlsx,.xls">
     </div>
 
-    <div id="tab-image" class="tab">
-      <p class="hint">한국어 OCR(베타). 이미지 업로드 → 자동 인식 → 아래 텍스트를 검토·보정 후 [텍스트에서 추출]을 누르면 미리보기에 채워집니다.</p>
-      <input type="file" id="file-image" accept="image/*">
-      <div id="ocr-progress" class="ocr-progress"></div>
-      <textarea id="ocr-text" class="ocr-text" rows="8"
-        placeholder="형식 예시 (날짜는 한 줄, 그 아래에 회원명과 시간):
-
-2026-05-04
-김민수 09:00
-박지영 10:30
-
-또는
-
-2026년 5월 4일
-김민수 09:00"></textarea>
-      <div class="row-actions">
-        <button type="button" id="btn-ocr-parse">텍스트에서 추출</button>
-      </div>
-    </div>
-
     <div id="preview" class="preview hidden">
       <h3>미리보기 <span id="preview-count" class="hint"></span></h3>
       <p class="hint">행을 직접 수정할 수 있습니다. 잘못된 행은 삭제 버튼으로 제거하세요. 모두 입력했으면 아래 <b>확정</b> 버튼을 누르면 캘린더로 이동합니다.</p>
@@ -115,11 +93,43 @@
     <form id="form-member" class="grid-form">
       <label>회원명<input name="name" required></label>
       <label>색상<input type="color" name="color" value="#3b82f6"></label>
+      <label>메모(선택)<input name="memo" placeholder="특이사항, 부상 이력 등"></label>
       <button type="submit">회원 추가</button>
     </form>
     <ul id="member-list" class="member-list"></ul>
   </section>
 </main>
+
+<dialog id="modal-session" class="modal">
+  <div class="modal-content">
+    <button class="modal-close" data-close aria-label="닫기">&times;</button>
+    <h3 id="ms-title">수업</h3>
+    <div id="ms-body" class="modal-body"></div>
+    <div class="modal-actions">
+      <button type="button" id="ms-edit-member">회원 편집</button>
+      <button type="button" id="ms-delete" class="danger">수업 삭제</button>
+      <button type="button" data-close>닫기</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="modal-member" class="modal">
+  <div class="modal-content">
+    <button class="modal-close" data-close aria-label="닫기">&times;</button>
+    <h3>회원 정보</h3>
+    <div class="modal-body">
+      <label>이름<input id="mm-name" type="text" required></label>
+      <label>색상<input id="mm-color" type="color"></label>
+      <label>메모<textarea id="mm-memo" rows="5" placeholder="특이사항, 부상, 컨디션, 목표 등"></textarea></label>
+      <p id="mm-stats" class="hint"></p>
+    </div>
+    <div class="modal-actions">
+      <button type="button" id="mm-delete" class="danger">회원 삭제</button>
+      <button type="button" id="mm-save" class="primary">저장</button>
+      <button type="button" data-close>닫기</button>
+    </div>
+  </div>
+</dialog>
 
 <script type="module" src="js/app.js"></script>
 </body>

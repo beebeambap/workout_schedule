@@ -104,38 +104,3 @@ export async function parseXLSX(file) {
   return rowsToSessions(norm);
 }
 
-// Heuristic line parser for OCR text. Pairs Korean names with times found
-// in the same line (regardless of order), under a date anchor from a prior line.
-export function parseFreeText(text) {
-  const lines = String(text || '').split(/\r?\n/);
-  const sessions = [];
-  let currentDate = null;
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (!line) continue;
-
-    const dateHit = parseDate(line);
-    if (dateHit) {
-      currentDate = dateHit;
-      // Don't 'continue' — a single line may contain both a date and entries
-    }
-    if (!currentDate) continue;
-
-    const names = [...line.matchAll(/([가-힯]{2,4})/g)].map(m => m[1]);
-    const times = [...line.matchAll(/(\d{1,2})\s*[:시.]\s*(\d{0,2})/g)]
-      .map(m => ({ h: parseInt(m[1], 10), mi: parseInt(m[2] || '0', 10) }))
-      .filter(t => t.h >= 0 && t.h <= 23 && t.mi >= 0 && t.mi <= 59);
-
-    if (!names.length || !times.length) continue;
-    const n = Math.min(names.length, times.length);
-    for (let i = 0; i < n; i++) {
-      sessions.push({
-        name: names[i],
-        date: currentDate,
-        startTime: pad(times[i].h) + ':' + pad(times[i].mi),
-        durationMin: 50
-      });
-    }
-  }
-  return { sessions, warnings: [] };
-}
