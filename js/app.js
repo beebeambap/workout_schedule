@@ -5,6 +5,14 @@ import { exportSchedule, exportScheduleBlob } from './exporter.js';
 import { sbReady, status as sbStatus } from './supabase.js';
 import { getSession, sendMagicLink, signOut, onAuthChange, updateUserMetadata } from './auth.js';
 import { preloadHolidays, ensureYearLoaded } from './holidays.js';
+import * as Pin from './pin.js';
+
+// Register service worker (PWA)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch((e) => console.warn('SW register failed', e));
+  });
+}
 
 const COLOR_PALETTE = ['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#06b6d4'];
 
@@ -806,6 +814,142 @@ function statusLabel(s) {
   return s === 'extended' ? 'PT 연장' : s === 'ended' ? 'PT 종료' : '활성';
 }
 
+// ---------- PIN lock ----------
+function showPinScreen(userId) {
+  $('#pin-screen').hidden = false;
+  $('#pin-input').value = '';
+  $('#pin-screen-error').textContent = '';
+  setTimeout(() => $('#pin-input').focus(), 50);
+  renderPinDots(0);
+}
+
+function hidePinScreen() {
+  $('#pin-screen').hidden = true;
+  Pin.markUnlocked();
+  Pin.noteVisibleNow();
+}
+
+function renderPinDots(filled) {
+  const total = parseInt($('#pin-input').maxLength, 10) || 6;
+  const max = Math.max(filled, 4);
+  const dots = $('#pin-dots');
+  dots.innerHTML = '';
+  for (let i = 0; i < max; i++) {
+    const d = document.createElement('span');
+    d.className = 'pin-dot' + (i < filled ? ' filled' : '');
+    dots.appendChild(d);
+  }
+}
+
+$('#pin-input').addEventListener('input', (e) => {
+  e.target.value = e.target.value.replace(/[^\d]/g, '');
+  renderPinDots(e.target.value.length);
+});
+$('#pin-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') $('#pin-submit').click();
+});
+
+$('#pin-submit').addEventListener('click', async () => {
+  const uid = currentSession?.user?.id;
+  if (!uid) return;
+  const pin = $('#pin-input').value;
+  if (!pin) return;
+  const ok = await Pin.verifyPin(uid, pin);
+  if (ok) {
+    hidePinScreen();
+  } else {
+    $('#pin-screen-error').textContent = 'PIN이 일치하지 않습니다.';
+    $('#pin-input').value = '';
+    renderPinDots(0);
+    $('#pin-input').focus();
+  }
+});
+
+$('#pin-forgot').addEventListener('click', async () => {
+  if (!confirm('PIN을 재설정하려면 로그아웃 후 이메일 매직 링크로 다시 로그인해야 합니다. 진행할까요?')) return;
+  const uid = currentSession?.user?.id;
+  if (uid) Pin.clearPin(uid);
+  Pin.lockNow();
+  await signOut();
+  // After signOut, onAuthChange will show auth screen.
+  $('#pin-screen').hidden = true;
+  alert('로그아웃 되었습니다. 이메일로 다시 로그인 후 PIN을 새로 설정하세요.');
+});
+
+// Background re-lock: if PIN is set and user goes away for >30s, lock on return.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    Pin.noteVisibleNow();
+  } else {
+    const uid = currentSession?.user?.id;
+    if (uid && Pin.isPinSet(uid) && Pin.shouldRelockOnReturn()) {
+      Pin.lockNow();
+      showPinScreen(uid);
+    }
+  }
+});
+
+// ---------- PIN settings (in profile modal) ----------
+function refreshPinUI() {
+  const uid = currentSession?.user?.id;
+  const has = uid && Pin.isPinSet(uid);
+  $('#pf-pin-set').hidden = !!has;
+  $('#pf-pin-change').hidden = !has;
+  $('#pf-pin-clear').hidden = !has;
+  $('#pf-pin-status').textContent = has
+    ? '잠금 사용 중 (이 기기에 한정).'
+    : '이 기기에서 잠금이 비활성화 되어 있습니다.';
+}
+
+function openPinSetup(mode) {
+  $('#pin-setup-title').textContent = mode === 'change' ? 'PIN 변경' : 'PIN 설정';
+  $('#pin-new').value = '';
+  $('#pin-confirm').value = '';
+  $('#pin-setup-error').textContent = '';
+  $('#modal-pin-setup').showModal();
+  setTimeout(() => $('#pin-new').focus(), 50);
+}
+
+$('#pf-pin-set').addEventListener('click', () => openPinSetup('set'));
+$('#pf-pin-change').addEventListener('click', () => openPinSetup('change'));
+
+$('#pf-pin-clear').addEventListener('click', () => {
+  if (!confirm('이 기기의 잠금을 해제할까요? 다른 기기는 영향받지 않습니다.')) return;
+  const uid = currentSession?.user?.id;
+  if (!uid) return;
+  Pin.clearPin(uid);
+  refreshPinUI();
+  flash('잠금이 해제되었습니다.');
+});
+
+$('#pin-setup-save').addEventListener('click', async () => {
+  const uid = currentSession?.user?.id;
+  if (!uid) return;
+  const a = $('#pin-new').value;
+  const b = $('#pin-confirm').value;
+  if (!/^\d{4,6}$/.test(a)) {
+    $('#pin-setup-error').textContent = 'PIN은 숫자 4~6자리여야 합니다.';
+    return;
+  }
+  if (a !== b) {
+    $('#pin-setup-error').textContent = '두 입력이 일치하지 않습니다.';
+    return;
+  }
+  try {
+    await Pin.setPin(uid, a);
+    Pin.markUnlocked();
+    $('#modal-pin-setup').close();
+    refreshPinUI();
+    flash('PIN이 저장되었습니다.');
+  } catch (err) {
+    $('#pin-setup-error').textContent = err.message || '저장 실패';
+  }
+});
+
+// Update PIN UI whenever profile modal opens
+const _origProfileClick = $('#btn-profile').onclick;
+$('#btn-profile').addEventListener('click', () => setTimeout(refreshPinUI, 50));
+
 // ---------- footer: last update from GitHub ----------
 async function loadLastUpdate() {
   const el = document.getElementById('last-update');
@@ -932,6 +1076,12 @@ async function onSignedIn(session) {
   refreshFilter();
   renderCalendar();
   renderMembers();
+
+  // PIN gate: lock the UI if a PIN is set and we're not already unlocked.
+  const uid = session?.user?.id;
+  if (uid && Pin.isPinSet(uid) && !Pin.isUnlocked()) {
+    showPinScreen(uid);
+  }
 }
 
 async function onSignedOut() {

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>PWA 아이콘 생성기</title>
+<style>
+  body { font-family: system-ui, sans-serif; padding: 40px; max-width: 720px; margin: 0 auto; }
+  h1 { margin: 0 0 8px; }
+  p { color: #4b5563; line-height: 1.6; }
+  .preview { display: flex; gap: 24px; margin: 24px 0; flex-wrap: wrap; }
+  .preview > div { text-align: center; }
+  canvas { border: 1px solid #e5e7eb; border-radius: 8px; }
+  button { padding: 10px 18px; border-radius: 8px; border: 1px solid #111827; background: #111827; color: #fff; font-size: 14px; cursor: pointer; }
+  ol { line-height: 1.8; }
+  code { background: #f3f4f6; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>PWA 아이콘 생성기</h1>
+<p>브라우저에서 이 페이지를 열고 아래 버튼을 눌러 <code>icon-192.png</code>, <code>icon-512.png</code>, <code>icon-180.png</code>(iOS) 세 개의 PNG를 다운로드한 뒤, 저장소의 <code>icons/</code> 폴더에 넣어 커밋해주세요.</p>
+
+<div class="preview">
+  <div><canvas id="c192" width="192" height="192"></canvas><div>192×192</div></div>
+  <div><canvas id="c512" width="512" height="512"></canvas><div>512×512</div></div>
+  <div><canvas id="c180" width="180" height="180"></canvas><div>180×180 (iOS)</div></div>
+</div>
+
+<button id="dl">3개 PNG 모두 다운로드</button>
+
+<ol style="margin-top:32px;">
+  <li>다운로드된 파일 3개를 저장소 <code>icons/</code> 폴더에 넣기</li>
+  <li><code>git add icons/ &amp;&amp; git commit -m "chore: pwa icons"</code></li>
+  <li>푸시 → GitHub Pages 배포 → 모바일에서 "홈 화면에 추가"</li>
+</ol>
+
+<script>
+async function loadSVG() {
+  const res = await fetch('../icons/icon.svg');
+  return await res.text();
+}
+
+async function render(canvas, svgText) {
+  const ctx = canvas.getContext('2d');
+  const blob = new Blob([svgText], { type: 'image/svg+xml' });
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  URL.revokeObjectURL(url);
+}
+
+function download(canvas, filename) {
+  canvas.toBlob(blob => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }, 'image/png');
+}
+
+(async () => {
+  const svg = await loadSVG();
+  await render(document.getElementById('c192'), svg);
+  await render(document.getElementById('c512'), svg);
+  await render(document.getElementById('c180'), svg);
+})();
+
+document.getElementById('dl').onclick = () => {
+  download(document.getElementById('c192'), 'icon-192.png');
+  setTimeout(() => download(document.getElementById('c512'), 'icon-512.png'), 200);
+  setTimeout(() => download(document.getElementById('c180'), 'icon-180.png'), 400);
+};
+</script>
+</body>
+</html>
