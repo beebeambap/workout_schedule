@@ -793,3 +793,37 @@ textarea.ocr-text {
 
 /* PIN section in profile modal */
 .pin-section h4 { font-weight: 600; }
+
+/* ---------- Native color picker as a simple circle ---------- */
+input.color-circle {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 32px; height: 32px;
+  border: 2px solid #d1d5db;
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  background: transparent;
+  vertical-align: middle;
+}
+input.color-circle:hover { border-color: #6b7280; }
+input.color-circle::-webkit-color-swatch-wrapper { padding: 0; }
+input.color-circle::-webkit-color-swatch { border: none; border-radius: 50%; }
+input.color-circle::-moz-color-swatch { border: none; border-radius: 50%; }
+.form-color-row { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+
+/* ---------- Quick-add modal layout ---------- */
+.form-row { display: flex; gap: 10px; }
+
+/* ---------- + 스케줄 button ---------- */
+#btn-quick-add.primary {
+  background: #2563eb; color: #fff; border-color: #2563eb;
+  font-weight: 600;
+}
+#btn-quick-add.primary:hover { background: #1d4ed8; }
+
+/* Day cells should look clickable */
+.wg-day-col, .month-grid .day { cursor: pointer; }
+.wg-day-col:hover { background: rgba(59, 130, 246, 0.03); }
+.month-grid .day:not(.other):hover { background: #f9fafb; }

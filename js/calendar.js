@@ -216,14 +216,21 @@ function appendNowLine(container, days, hStart, hEnd) {
 export function renderMonth(container, anchor, sessions, members, opts = {}) {
   const { hideMemberName = false } = opts;
   const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
-  const gridStart = addDays(first, -first.getDay());
+  // Monday-first grid: shift back to nearest preceding Monday
+  const monOffset = (first.getDay() + 6) % 7; // Mon=0 ... Sun=6
+  const gridStart = addDays(first, -monOffset);
   const days = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
   const today = ymd(new Date());
   const memberMap = Object.fromEntries(members.map(m => [m.id, m]));
 
   const gridClass = 'month-grid' + (hideMemberName ? ' time-only' : '');
   let html = `<div class="${gridClass}">`;
-  for (const name of DOW_KR) html += `<div class="day-head">${name}</div>`;
+  // Monday-first day-head order: 월화수목금토일
+  const dowOrder = ['월', '화', '수', '목', '금', '토', '일'];
+  const dowOrderClass = ['', '', '', '', '', 'dow-sat', 'dow-sun'];
+  for (let i = 0; i < 7; i++) {
+    html += `<div class="day-head ${dowOrderClass[i]}">${dowOrder[i]}</div>`;
+  }
   for (const d of days) {
     const dStr = ymd(d);
     let cls = 'day';
@@ -247,7 +254,7 @@ export function renderMonth(container, anchor, sessions, members, opts = {}) {
         return `<span class="${evCls}" data-session-id="${sid}" style="background:${color}">${label}</span>`;
       }).join('');
     const holidayLine = holiday ? `<span class="day-holiday">${escapeHtml(holiday)}</span>` : '';
-    html += `<div class="${cls}"><span class="day-num">${d.getDate()}</span>${holidayLine}${evs}</div>`;
+    html += `<div class="${cls}" data-date="${dStr}"><span class="day-num">${d.getDate()}</span>${holidayLine}${evs}</div>`;
   }
   html += '</div>';
   container.innerHTML = html;

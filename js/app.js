@@ -33,31 +33,6 @@ const esc = (s) => String(s).replace(/[&<>"']/g, c => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
 ));
 
-// ---------- color palette ----------
-function buildColorPalettes() {
-  document.querySelectorAll('.color-palette').forEach(palette => {
-    const target = document.getElementById(palette.dataset.target);
-    if (!palette.children.length) {
-      palette.innerHTML = COLOR_PALETTE.map(c =>
-        `<button type="button" class="color-swatch" data-color="${c}" style="background:${c}" aria-label="${c}"></button>`
-      ).join('');
-    }
-    palette.querySelectorAll('.color-swatch').forEach(s => {
-      s.addEventListener('click', () => {
-        target.value = s.dataset.color;
-        palette.querySelectorAll('.color-swatch').forEach(x =>
-          x.classList.toggle('selected', x.dataset.color === s.dataset.color));
-      });
-    });
-    syncPaletteSelection(palette, target.value);
-  });
-}
-function syncPaletteSelection(palette, value) {
-  palette.querySelectorAll('.color-swatch').forEach(x =>
-    x.classList.toggle('selected', x.dataset.color === value));
-}
-buildColorPalettes();
-
 // ---------- view switching ----------
 $$('.topbar nav button').forEach(b => {
   b.addEventListener('click', () => switchView(b.dataset.view));
@@ -222,12 +197,25 @@ $('#btn-cancel').addEventListener('click', () => {
   $('#preview').classList.add('hidden');
 });
 
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, rej) => setTimeout(
+      () => rej(new Error(`${label} 응답 없음 (${ms / 1000}s 타임아웃). 네트워크 또는 Supabase 상태를 확인해주세요.`)),
+      ms
+    )),
+  ]);
+}
+
 async function commitSessions(arr) {
   const valid = arr.filter(s => s.name && s.date && s.startTime);
-  // Resolve members first (insert any new ones), then bulk-insert sessions.
+  console.log('[commit] start —', valid.length, '건');
+  if (!valid.length) throw new Error('유효한 행이 없습니다 (회원·날짜·시간 모두 필요).');
   const enriched = [];
-  for (const s of valid) {
-    const m = await Store.ensureMember(s.name);
+  for (let i = 0; i < valid.length; i++) {
+    const s = valid[i];
+    console.log(`[commit] (${i + 1}/${valid.length}) ensureMember`, s.name);
+    const m = await withTimeout(Store.ensureMember(s.name), 15_000, `회원 등록 (${s.name})`);
     enriched.push({
       memberId: m.id,
       date: s.date,
@@ -235,7 +223,9 @@ async function commitSessions(arr) {
       durationMin: parseInt(s.durationMin, 10) || 50,
     });
   }
-  await Store.addSessions(enriched);
+  console.log('[commit] addSessions', enriched.length);
+  await withTimeout(Store.addSessions(enriched), 15_000, '세션 등록');
+  console.log('[commit] done');
 }
 
 // ---------- members ----------
@@ -247,9 +237,7 @@ $('#form-member').addEventListener('submit', async (e) => {
   try {
     await Store.ensureMember(name, fd.get('color'), String(fd.get('memo') || '').trim());
     e.target.reset();
-    const c = $('#form-member-color');
-    c.value = '#3b82f6';
-    syncPaletteSelection(document.querySelector('.color-palette[data-target="form-member-color"]'), c.value);
+    $('#form-member-color').value = '#3b82f6';
   } catch (err) {
     alert('저장 오류: ' + err.message);
   }
@@ -468,12 +456,79 @@ $('#pe-save').addEventListener('click', async () => {
   }
 });
 
-// ---------- click on a calendar event opens session modal ----------
+// ---------- click on calendar: existing event → detail; empty slot → quick-add ----------
 $('#calendar').addEventListener('click', (ev) => {
-  const target = ev.target.closest('[data-session-id]');
-  if (!target) return;
-  const sid = target.dataset.sessionId;
-  if (sid) openSessionModal(sid);
+  const evTarget = ev.target.closest('[data-session-id]');
+  if (evTarget && evTarget.dataset.sessionId) {
+    openSessionModal(evTarget.dataset.sessionId);
+    return;
+  }
+  // Week view: click on .wg-day-col → infer time from Y position
+  const dayCol = ev.target.closest('.wg-day-col');
+  if (dayCol && dayCol.dataset.date) {
+    const rect = dayCol.getBoundingClientRect();
+    const y = ev.clientY - rect.top;
+    const totalMin = Math.max(0, Math.min(23 * 60 + 30, Math.floor(y / HOUR_HEIGHT * 60 / 30) * 30));
+    const h = Math.floor(totalMin / 60);
+    const mi = totalMin % 60;
+    const time = String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
+    openQuickAdd({ date: dayCol.dataset.date, time });
+    return;
+  }
+  // Month view: click on .day cell
+  const day = ev.target.closest('.month-grid .day');
+  if (day && day.dataset.date) {
+    openQuickAdd({ date: day.dataset.date });
+  }
+});
+
+// ---------- quick-add modal ----------
+function openQuickAdd({ date, time } = {}) {
+  $('#qa-name').value = '';
+  $('#qa-date').value = date || ymd(state.anchor || new Date());
+  $('#qa-start').value = time || '';
+  $('#qa-duration').value = 50;
+  const dl = $('#qa-name-options');
+  dl.innerHTML = Store.members().map(m => `<option value="${esc(m.name)}"></option>`).join('');
+  $('#modal-quick-add').showModal();
+  setTimeout(() => $('#qa-name').focus(), 50);
+}
+
+$('#btn-quick-add').addEventListener('click', () => openQuickAdd());
+
+let qaSaveBusy = false;
+$('#qa-save').addEventListener('click', async () => {
+  if (qaSaveBusy) return;
+  const name = $('#qa-name').value.trim();
+  const date = $('#qa-date').value;
+  const start = $('#qa-start').value;
+  const duration = parseInt($('#qa-duration').value, 10) || 50;
+  if (!name || !date || !start) {
+    alert('회원, 날짜, 시작 시간을 모두 입력하세요.');
+    return;
+  }
+  qaSaveBusy = true;
+  const btn = $('#qa-save');
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '저장 중...';
+  try {
+    const m = await withTimeout(Store.ensureMember(name), 15_000, '회원 등록');
+    await withTimeout(
+      Store.addSessions([{ memberId: m.id, date, startTime: start, durationMin: duration }]),
+      15_000,
+      '세션 등록'
+    );
+    $('#modal-quick-add').close();
+    flash('등록되었습니다.');
+  } catch (err) {
+    console.error('[quick-add] error:', err);
+    alert('저장 오류: ' + (err?.message || err));
+  } finally {
+    qaSaveBusy = false;
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
 });
 
 function openSessionModal(sessionId) {
@@ -530,7 +585,6 @@ function openMemberModal(memberId) {
   if (!m) return;
   $('#mm-name').value = m.name;
   $('#mm-color').value = m.color;
-  syncPaletteSelection(document.querySelector('.color-palette[data-target="mm-color"]'), m.color);
   $('#mm-memo').value = m.memo || '';
   const statusSel = $('#mm-status');
   if (statusSel) statusSel.value = m.status || 'active';
