@@ -158,6 +158,55 @@ alter table public.members
 
 이 SQL을 실행하지 않아도 기본 캘린더/회원 관리 기능은 그대로 동작합니다. "내 일정 추가"와 통계의 PT 연장/종료 항목은 마이그레이션 후 활성화됩니다.
 
+## 6.7 매직 링크 이메일 커스터마이즈 (레슨핏 브랜딩)
+
+기본 발송 메일은 "Confirm your signup" 같은 영문 + Supabase 발신자입니다. 한국 사용자 신뢰도와 브랜드 통일성을 위해 한국어로 바꿉니다.
+
+**Supabase Dashboard → Authentication → Email Templates → Magic Link**
+
+**Subject (제목)**:
+```
+[레슨핏] 로그인 링크
+```
+
+**Message (Body)** — HTML 형식:
+```html
+<div style="font-family:'Noto Sans KR',system-ui,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#111827;">
+  <h2 style="margin:0 0 16px;font-size:20px;">레슨핏 로그인</h2>
+  <p style="line-height:1.6;color:#374151;">
+    안녕하세요, 레슨핏 로그인 요청이 들어왔습니다.<br>
+    아래 버튼을 누르시면 자동으로 로그인됩니다.
+  </p>
+  <p style="margin:28px 0;text-align:center;">
+    <a href="{{ .ConfirmationURL }}"
+       style="display:inline-block;padding:12px 24px;background:#111827;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">
+      레슨핏 로그인하기
+    </a>
+  </p>
+  <p style="font-size:13px;color:#6b7280;line-height:1.6;">
+    버튼이 동작하지 않으면 이 링크를 복사해 주소창에 붙여넣으세요:<br>
+    <span style="word-break:break-all;color:#2563eb;">{{ .ConfirmationURL }}</span>
+  </p>
+  <hr style="border:0;border-top:1px solid #e5e7eb;margin:24px 0;">
+  <p style="font-size:12px;color:#9ca3af;line-height:1.6;">
+    본인이 요청하지 않았다면 이 메일은 무시해 주세요. 링크는 24시간 후 만료됩니다.<br>
+    — 레슨핏 (Lesson Fit)
+  </p>
+</div>
+```
+
+저장 후 다음 매직 링크 발송부터 즉시 적용됩니다.
+
+### 발신자 이름 / 발신 이메일 변경 (선택)
+
+기본 발신자는 `noreply@mail.app.supabase.io`. 이걸 `noreply@lessonfit.com` 같은 자체 도메인으로 바꾸려면:
+
+1. **Project Settings → Auth → SMTP Settings**에서 "Enable Custom SMTP" ON
+2. 외부 SMTP 제공자 연결 (권장: Resend / SendGrid / Mailgun — 무료 티어 충분)
+3. 발신자 이메일·이름 입력 (예: `레슨핏 <noreply@lessonfit.com>`)
+
+자체 도메인은 SPF/DKIM 인증 필요. 처음엔 그냥 기본 SMTP 쓰고, 사용자가 늘면 전환 권장.
+
 ## 7. 동작 검증
 
 - 캘린더에서 수업 추가 → 다른 기기에서 같은 계정으로 로그인하면 자동 반영.

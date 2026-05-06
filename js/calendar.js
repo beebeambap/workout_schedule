@@ -1,9 +1,9 @@
 import { lookupHoliday } from './holidays.js';
 
 const DOW_KR = ['일', '월', '화', '수', '목', '금', '토'];
-const DEFAULT_START = 6;
-const DEFAULT_END = 22; // exclusive
-const HOUR_HEIGHT = 56; // pixels per hour
+const FULL_START = 0;
+const FULL_END = 24; // on-screen always shows full 24h
+export const HOUR_HEIGHT = 56; // pixels per hour
 
 function dayClass(date) {
   // returns extra class names based on day of week / holiday
@@ -86,9 +86,12 @@ export function renderWeek(container, anchor, sessions, members, fitToSessions =
   const weekSet = new Set(days.map(ymd));
   const weekSessions = sessions.filter(s => weekSet.has(s.date));
 
-  let hStart = DEFAULT_START;
-  let hEnd = DEFAULT_END;
-  if (fitToSessions && weekSessions.length) {
+  // On-screen view always shows the full 24h. Trim only happens when
+  // exporting (so the JPG output is compact when a single member's
+  // sessions are clustered in a short range).
+  let hStart = FULL_START;
+  let hEnd = FULL_END;
+  if (exportMode && fitToSessions && weekSessions.length) {
     const startMins = weekSessions.map(s => toMin(s.startTime));
     const endMins = weekSessions.map(s => toMin(s.startTime) + (s.durationMin || 50));
     hStart = Math.max(0, Math.floor(Math.min(...startMins) / 60));

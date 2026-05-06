@@ -12,7 +12,7 @@ export const status = {
 export const sbReady = status.url && status.key && status.lib;
 
 if (!sbReady) {
-  console.warn('[PT 스케줄러] Supabase 미설정', status);
+  console.warn('[레슨핏] Supabase 미설정', status);
 }
 
 // Default lock uses navigator.locks; under brief contention it can throw

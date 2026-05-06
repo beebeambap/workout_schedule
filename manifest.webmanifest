@@ -1,7 +1,7 @@
 {
-  "name": "PT 스케줄러",
-  "short_name": "스케줄러",
-  "description": "회원·세션 스케줄 관리. 캘린더, 통계, 잠금까지 한 앱에서.",
+  "name": "레슨핏",
+  "short_name": "레슨핏",
+  "description": "트레이너·강사를 위한 레슨 스케줄 + 회원 관리. 캘린더, 통계, 잠금까지 한 앱에서.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

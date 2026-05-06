@@ -99,8 +99,18 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px; }
 #btn-export:hover, #btn-export-all:hover { background: #1f2937; }
 
 .calendar-canvas {
-  background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+  padding: 0; overflow: hidden;
+  max-height: 75vh;
+  overflow-y: auto;
+  position: relative;
 }
+.calendar-canvas .wg-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+.calendar-canvas .wg { border: 0; border-radius: 0; }
 
 /* Week view (absolute time-proportional layout) */
 .wg {

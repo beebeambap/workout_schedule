@@ -1,6 +1,6 @@
 import { Store } from './store.js';
 import { parseCSV, parseXLSX, parseFreeText } from './parser.js';
-import { renderWeek, renderMonth, computeEndTime } from './calendar.js';
+import { renderWeek, renderMonth, computeEndTime, HOUR_HEIGHT } from './calendar.js';
 import { exportSchedule, exportScheduleBlob } from './exporter.js';
 import { sbReady, status as sbStatus } from './supabase.js';
 import { getSession, sendMagicLink, signOut, onAuthChange, updateUserMetadata } from './auth.js';
@@ -302,7 +302,7 @@ $('#btn-next').addEventListener('click', () => {
 
 $('#btn-today').addEventListener('click', () => {
   state.anchor = new Date();
-  renderCalendar();
+  renderCalendar({ scrollToNow: true });
 });
 
 $('#view-mode').addEventListener('change', (e) => {
@@ -386,8 +386,10 @@ function refreshFilter() {
 }
 
 let _renderingForYear = null;
-function renderCalendar() {
+let _calendarFirstRender = true;
+function renderCalendar({ scrollToNow = false } = {}) {
   const cont = $('#calendar');
+  const prevScroll = cont.scrollTop;
   let sessions = Store.sessions();
   if (state.filter) sessions = sessions.filter(s => s.memberId === state.filter);
   const members = Store.members();
@@ -396,6 +398,19 @@ function renderCalendar() {
     ? renderWeek(cont, state.anchor, sessions, members, fit)
     : renderMonth(cont, state.anchor, sessions, members);
   $('#period-label').textContent = label;
+
+  // Scroll: preserve user position; on first render or explicit request, jump to current hour.
+  if (state.mode === 'week') {
+    if (_calendarFirstRender || scrollToNow || prevScroll === 0) {
+      const headerH = cont.querySelector('.wg-header')?.offsetHeight || 0;
+      const desiredHour = Math.max(0, new Date().getHours() - 2);
+      cont.scrollTop = desiredHour * HOUR_HEIGHT;
+      _calendarFirstRender = false;
+    } else {
+      cont.scrollTop = prevScroll;
+    }
+  }
+
   // If holidays for this year aren't loaded yet, load and re-render once.
   const y = state.anchor.getFullYear();
   if (_renderingForYear !== y) {
@@ -403,8 +418,10 @@ function renderCalendar() {
     ensureYearLoaded(y).then(() => {
       if (state.view === 'calendar' && state.anchor.getFullYear() === y) {
         const cont2 = $('#calendar');
+        const before = cont2.scrollTop;
         if (state.mode === 'week') renderWeek(cont2, state.anchor, sessions, members, fit);
         else renderMonth(cont2, state.anchor, sessions, members);
+        cont2.scrollTop = before;
       }
     });
   }

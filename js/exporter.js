@@ -50,7 +50,7 @@ function buildWeekSummary(start, sessions) {
 // Build the export DOM, capture to canvas, return a JPG Blob.
 export async function exportScheduleBlob({ member, anchor, mode, sessions, members }) {
   const filtered = member ? sessions.filter(s => s.memberId === member.id) : sessions;
-  const title = member ? `${member.name}님 PT 스케줄` : '전체 PT 스케줄';
+  const title = member ? `${member.name}님 스케줄` : '전체 레슨 스케줄';
 
   const node = document.createElement('div');
   node.className = 'export-card';

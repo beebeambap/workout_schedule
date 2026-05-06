@@ -1,4 +1,4 @@
-// PT 스케줄러 service worker — basic offline cache.
+// 레슨핏 service worker — basic offline cache.
 // - HTML/document: network-first (so updates appear when online)
 // - Same-origin assets (CSS/JS/icons): cache-first
 // - Cross-origin (Supabase, CDN, GitHub API): bypass entirely
