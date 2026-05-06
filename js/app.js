@@ -2,6 +2,7 @@ import { Store } from './store.js';
 import { parseCSV, parseXLSX, parseFreeText } from './parser.js';
 import { renderWeek, renderMonth, computeEndTime, HOUR_HEIGHT } from './calendar.js';
 import { exportSchedule, exportScheduleBlob } from './exporter.js';
+import { buildICS } from './ics.js';
 import { sbReady, status as sbStatus } from './supabase.js';
 import { getSession, sendMagicLink, signOut, onAuthChange, updateUserMetadata } from './auth.js';
 import { preloadHolidays, ensureYearLoaded } from './holidays.js';
@@ -966,6 +967,31 @@ $('#pin-setup-save').addEventListener('click', async () => {
 // Update PIN UI whenever profile modal opens
 const _origProfileClick = $('#btn-profile').onclick;
 $('#btn-profile').addEventListener('click', () => setTimeout(refreshPinUI, 50));
+
+// ---------- ICS export (for Google/Apple Calendar import) ----------
+$('#btn-export-ics').addEventListener('click', () => {
+  const all = Store.sessions();
+  const sessions = state.filter ? all.filter(s => s.memberId === state.filter) : all;
+  if (!sessions.length) { alert('내보낼 일정이 없습니다.'); return; }
+  const member = state.filter ? Store.members().find(m => m.id === state.filter) : null;
+  const calName = member ? `레슨핏 - ${member.name}` : '레슨핏';
+  const ics = buildICS(sessions, Store.members(), { calendarName: calName });
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${member ? member.name : 'lessonfit'}_${ymd(new Date())}.ics`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  alert(
+    'ICS 파일이 다운로드되었어요.\n\n' +
+    '구글 캘린더 가져오기 방법:\n' +
+    '1) 구글 캘린더 열기\n' +
+    '2) 좌측 "다른 캘린더" 옆 + 버튼 → "가져오기"\n' +
+    '3) 받은 .ics 파일 선택 → 가져올 캘린더 고르기 → 가져오기\n\n' +
+    '※ 같은 일정을 여러 번 가져오면 중복될 수 있습니다.'
+  );
+});
 
 // ---------- footer: last update from GitHub ----------
 async function loadLastUpdate() {

@@ -110,7 +110,11 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px; }
   top: 0;
   z-index: 3;
 }
-.calendar-canvas .wg { border: 0; border-radius: 0; }
+.calendar-canvas .wg {
+  border: 0;
+  border-radius: 0;
+  overflow: visible; /* let sticky header stick to .calendar-canvas */
+}
 
 /* Week view (absolute time-proportional layout) */
 .wg {

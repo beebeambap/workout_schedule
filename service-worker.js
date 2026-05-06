@@ -3,7 +3,7 @@
 // - Same-origin assets (CSS/JS/icons): cache-first
 // - Cross-origin (Supabase, CDN, GitHub API): bypass entirely
 
-const CACHE = 'pt-cache-v1';
+const CACHE = 'pt-cache-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -19,6 +19,7 @@ const ASSETS = [
   './js/supabase.js',
   './js/holidays.js',
   './js/pin.js',
+  './js/ics.js',
   './icons/icon.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',
