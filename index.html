@@ -154,11 +154,27 @@
     <form id="form-member" class="grid-form">
       <label>회원명<input name="name" required></label>
       <label>메모(선택)<input name="memo" placeholder="특이사항, 부상 이력 등"></label>
-      <label class="form-color-row">색상
-        <input type="color" name="color" id="form-member-color" class="color-circle" value="#3b82f6">
-      </label>
+      <div class="form-color-row">
+        <span class="form-color-label">색상</span>
+        <div class="color-picker-wrap">
+          <div class="color-palette" id="form-color-palette"></div>
+          <label class="color-custom-btn" title="사용자 지정 색상">
+            <span>&#9998;</span>
+            <input type="color" name="color" id="form-member-color" value="#3b82f6">
+          </label>
+        </div>
+      </div>
       <button type="submit">회원 추가</button>
     </form>
+    <div class="member-filters">
+      <input id="member-search" type="search" placeholder="이름 검색...">
+      <select id="member-status-filter">
+        <option value="">전체 상태</option>
+        <option value="active">활성</option>
+        <option value="extended">PT 연장</option>
+        <option value="ended">PT 종료</option>
+      </select>
+    </div>
     <ul id="member-list" class="member-list"></ul>
   </section>
 </main>
@@ -194,9 +210,16 @@
           <option value="ended">PT 종료</option>
         </select>
       </label>
-      <label class="form-color-row">색상
-        <input type="color" id="mm-color" class="color-circle" value="#3b82f6">
-      </label>
+      <div class="form-color-row">
+        <span class="form-color-label">색상</span>
+        <div class="color-picker-wrap">
+          <div class="color-palette" id="mm-color-palette"></div>
+          <label class="color-custom-btn" title="사용자 지정 색상">
+            <span>&#9998;</span>
+            <input type="color" id="mm-color" value="#3b82f6">
+          </label>
+        </div>
+      </div>
       <label>메모<textarea id="mm-memo" rows="5" placeholder="특이사항, 부상, 컨디션, 목표 등"></textarea></label>
       <p id="mm-stats" class="hint"></p>
     </div>
@@ -250,15 +273,19 @@
     <h3>스케줄 추가</h3>
     <div class="modal-body">
       <label>회원
-        <input id="qa-name" list="qa-name-options" autocomplete="off" required placeholder="회원 이름 입력 또는 선택">
-        <datalist id="qa-name-options"></datalist>
+        <select id="qa-member-select">
+          <option value="">회원 선택...</option>
+        </select>
+      </label>
+      <label id="qa-new-name-row" hidden>새 회원 이름
+        <input id="qa-name" type="text" autocomplete="off" placeholder="새 회원 이름">
       </label>
       <label>날짜<input id="qa-date" type="date" required></label>
       <div class="form-row">
         <label style="flex:1">시작 시간<input id="qa-start" type="time" required></label>
         <label style="width:120px">소요(분)<input id="qa-duration" type="number" min="10" step="5" value="50"></label>
       </div>
-      <p class="hint">새 회원 이름을 입력하면 자동으로 등록됩니다. 여러 건을 한 번에 등록하려면 상단의 "스케줄 추가" 메뉴를 이용하세요.</p>
+      <p class="hint">새 회원은 목록 맨 아래 "+ 신규 회원 직접 입력"을 선택하세요. 여러 건을 한 번에 등록하려면 상단의 "스케줄 추가" 메뉴를 이용하세요.</p>
     </div>
     <div class="modal-actions">
       <button type="button" id="qa-save" class="primary">등록</button>

@@ -229,6 +229,38 @@ async function commitSessions(arr) {
 }
 
 // ---------- members ----------
+function initColorPicker(inputEl, paletteEl) {
+  const customBtn = inputEl.closest('.color-custom-btn');
+  function sync() {
+    const v = (inputEl.value || '').toLowerCase();
+    let inPalette = false;
+    paletteEl.querySelectorAll('.color-swatch').forEach(b => {
+      const match = b.dataset.color.toLowerCase() === v;
+      b.classList.toggle('selected', match);
+      if (match) inPalette = true;
+    });
+    if (customBtn) {
+      customBtn.classList.toggle('custom-active', !inPalette && !!v);
+      customBtn.style.background = (!inPalette && v) ? v : '';
+    }
+  }
+  paletteEl.innerHTML = COLOR_PALETTE.map(c =>
+    `<button type="button" class="color-swatch" data-color="${c}" style="background:${c}" title="${c}"></button>`
+  ).join('');
+  paletteEl.querySelectorAll('.color-swatch').forEach(b => {
+    b.addEventListener('click', () => {
+      inputEl.value = b.dataset.color;
+      sync();
+    });
+  });
+  if (inputEl._cpSync) inputEl.removeEventListener('input', inputEl._cpSync);
+  inputEl._cpSync = sync;
+  inputEl.addEventListener('input', sync);
+  sync();
+}
+
+initColorPicker($('#form-member-color'), $('#form-color-palette'));
+
 $('#form-member').addEventListener('submit', async (e) => {
   e.preventDefault();
   const fd = new FormData(e.target);
@@ -238,38 +270,65 @@ $('#form-member').addEventListener('submit', async (e) => {
     await Store.ensureMember(name, fd.get('color'), String(fd.get('memo') || '').trim());
     e.target.reset();
     $('#form-member-color').value = '#3b82f6';
+    initColorPicker($('#form-member-color'), $('#form-color-palette'));
   } catch (err) {
     alert('저장 오류: ' + err.message);
   }
 });
 
+const memberFilters = { search: '', status: '' };
+$('#member-search')?.addEventListener('input', (e) => {
+  memberFilters.search = e.target.value.trim().toLowerCase();
+  renderMembers();
+});
+$('#member-status-filter')?.addEventListener('change', (e) => {
+  memberFilters.status = e.target.value;
+  renderMembers();
+});
+
 function renderMembers() {
   const ul = $('#member-list');
-  const ms = Store.members();
+  let ms = Store.members();
+  const total = ms.length;
+  if (memberFilters.search) {
+    ms = ms.filter(m => m.name.toLowerCase().includes(memberFilters.search));
+  }
+  if (memberFilters.status) {
+    ms = ms.filter(m => (m.status || 'active') === memberFilters.status);
+  }
   const counts = Store.countByMember();
-  if (!ms.length) {
+  if (!total) {
     ul.innerHTML = '<li class="ml-empty">등록된 회원이 없습니다. 가져오기에서 일정을 등록하면 자동으로 생성됩니다.</li>';
+    return;
+  }
+  if (!ms.length) {
+    ul.innerHTML = '<li class="ml-empty">검색 결과가 없습니다.</li>';
     return;
   }
   ul.innerHTML = ms.map(m => {
     const memoPreview = (m.memo || '').replace(/\s+/g, ' ').trim();
-    return `<li class="member-card" data-id="${m.id}">
-      <div class="mc-head">
-        <span class="mc-color" style="background:${m.color}"></span>
-        <button class="mc-edit" data-id="${m.id}" title="정보 편집" aria-label="정보 편집">✎</button>
-      </div>
-      <div class="mc-name">${esc(m.name)}</div>
-      <div class="mc-count">수업 ${counts[m.id] || 0}건</div>
-      ${memoPreview ? `<div class="mc-memo">${esc(memoPreview)}</div>` : '<div class="mc-memo mc-memo-empty">메모 없음</div>'}
+    const status = m.status && m.status !== 'active'
+      ? `<span class="mr-status mr-status-${esc(m.status)}">${statusLabel(m.status)}</span>`
+      : '';
+    const memo = memoPreview
+      ? `<span class="mr-memo">${esc(memoPreview)}</span>`
+      : `<span class="mr-memo mr-memo-empty">메모 없음</span>`;
+    return `<li class="member-row" data-id="${m.id}" style="--accent:${m.color}">
+      <span class="mr-color" style="background:${m.color}"></span>
+      <span class="mr-name">${esc(m.name)}</span>
+      ${status}
+      <span class="mr-count">${counts[m.id] || 0}건</span>
+      ${memo}
+      <button class="mr-edit" data-id="${m.id}" title="정보 편집" aria-label="정보 편집">✎</button>
     </li>`;
   }).join('');
-  ul.querySelectorAll('.mc-edit').forEach(b => {
+  ul.querySelectorAll('.mr-edit').forEach(b => {
     b.addEventListener('click', (ev) => {
       ev.stopPropagation();
       openMemberModal(b.dataset.id);
     });
   });
-  ul.querySelectorAll('li.member-card').forEach(li => {
+  ul.querySelectorAll('li.member-row').forEach(li => {
     li.addEventListener('click', () => openMemberDetail(li.dataset.id));
   });
 }
@@ -484,22 +543,34 @@ $('#calendar').addEventListener('click', (ev) => {
 
 // ---------- quick-add modal ----------
 function openQuickAdd({ date, time } = {}) {
+  const sel = $('#qa-member-select');
+  sel.innerHTML = '<option value="">회원 선택...</option>'
+    + Store.members().map(m => `<option value="${esc(m.name)}">${esc(m.name)}</option>`).join('')
+    + '<option value="__new__">+ 신규 회원 직접 입력</option>';
+  $('#qa-new-name-row').hidden = true;
   $('#qa-name').value = '';
   $('#qa-date').value = date || ymd(state.anchor || new Date());
   $('#qa-start').value = time || '';
   $('#qa-duration').value = 50;
-  const dl = $('#qa-name-options');
-  dl.innerHTML = Store.members().map(m => `<option value="${esc(m.name)}"></option>`).join('');
   $('#modal-quick-add').showModal();
-  setTimeout(() => $('#qa-name').focus(), 50);
+  setTimeout(() => sel.focus(), 50);
 }
+
+$('#qa-member-select').addEventListener('change', () => {
+  const isNew = $('#qa-member-select').value === '__new__';
+  $('#qa-new-name-row').hidden = !isNew;
+  if (isNew) setTimeout(() => $('#qa-name').focus(), 50);
+});
 
 $('#btn-quick-add').addEventListener('click', () => openQuickAdd());
 
 let qaSaveBusy = false;
 $('#qa-save').addEventListener('click', async () => {
   if (qaSaveBusy) return;
-  const name = $('#qa-name').value.trim();
+  const selVal = $('#qa-member-select').value;
+  const name = selVal === '__new__'
+    ? $('#qa-name').value.trim()
+    : selVal;
   const date = $('#qa-date').value;
   const start = $('#qa-start').value;
   const duration = parseInt($('#qa-duration').value, 10) || 50;
@@ -585,6 +656,7 @@ function openMemberModal(memberId) {
   if (!m) return;
   $('#mm-name').value = m.name;
   $('#mm-color').value = m.color;
+  initColorPicker($('#mm-color'), $('#mm-color-palette'));
   $('#mm-memo').value = m.memo || '';
   const statusSel = $('#mm-status');
   if (statusSel) statusSel.value = m.status || 'active';
