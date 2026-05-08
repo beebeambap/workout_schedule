@@ -1,9 +1,11 @@
 // 레슨핏 service worker — basic offline cache.
 // - HTML/document: network-first (so updates appear when online)
-// - Same-origin assets (CSS/JS/icons): cache-first
+// - Same-origin assets (CSS/JS/icons): stale-while-revalidate
+//   (serve cache immediately, but always refetch in background so the next
+//    refresh shows the new version)
 // - Cross-origin (Supabase, CDN, GitHub API): bypass entirely
 
-const CACHE = 'pt-cache-v4';
+const CACHE = 'pt-cache-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -70,17 +72,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first for everything else (CSS/JS/images)
+  // Stale-while-revalidate for everything else (CSS/JS/images)
   event.respondWith(
     caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req).then((res) => {
+      const networkFetch = fetch(req).then((res) => {
         if (res && res.status === 200) {
           const copy = res.clone();
           caches.open(CACHE).then((c) => c.put(req, copy));
         }
         return res;
       }).catch(() => cached);
+      return cached || networkFetch;
     })
   );
 });

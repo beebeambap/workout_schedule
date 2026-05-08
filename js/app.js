@@ -17,6 +17,7 @@ if ('serviceWorker' in navigator) {
 
 const COLOR_PALETTE = ['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#06b6d4'];
 
+const VIEW_STATE_KEY = 'lf_view_state';
 const state = {
   view: 'calendar',
   mode: 'week',
@@ -24,6 +25,23 @@ const state = {
   filter: '',
   pending: null
 };
+
+function saveViewState() {
+  try {
+    localStorage.setItem(VIEW_STATE_KEY, JSON.stringify({
+      view: state.view,
+      mode: state.mode,
+    }));
+  } catch (e) {}
+}
+function loadViewState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(VIEW_STATE_KEY) || '{}');
+    if (s.view && ['calendar', 'import', 'members'].includes(s.view)) state.view = s.view;
+    if (s.mode && ['week', 'month'].includes(s.mode)) state.mode = s.mode;
+  } catch (e) {}
+}
+loadViewState();
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -39,6 +57,7 @@ $$('.topbar nav button').forEach(b => {
 });
 function switchView(name) {
   state.view = name;
+  saveViewState();
   $$('.topbar nav button').forEach(b => b.classList.toggle('active', b.dataset.view === name));
   $$('main .view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
   if (name === 'calendar') renderCalendar();
@@ -355,6 +374,7 @@ $('#btn-today').addEventListener('click', () => {
 
 $('#view-mode').addEventListener('change', (e) => {
   state.mode = e.target.value;
+  saveViewState();
   renderCalendar();
 });
 
@@ -1243,8 +1263,8 @@ async function onSignedIn(session) {
   }
   await maybeMigrateLocal();
   refreshFilter();
-  renderCalendar();
-  renderMembers();
+  $('#view-mode').value = state.mode;
+  switchView(state.view);
 
   // PIN gate: lock the UI if a PIN is set and we're not already unlocked.
   const uid = session?.user?.id;

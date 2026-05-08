@@ -1,3 +1,32 @@
+:root {
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-soft: #eff6ff;
+  --slate: #111827;
+  --slate-hover: #1f2937;
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-alt: #fafafa;
+  --surface-soft: #f9fafb;
+  --border: #e5e7eb;
+  --border-strong: #d1d5db;
+  --text: #111827;
+  --text-muted: #6b7280;
+  --text-faint: #9ca3af;
+  --danger: #dc2626;
+  --danger-bg: #fee2e2;
+  --danger-border: #fecaca;
+  --info-bg: #dbeafe;
+  --info-text: #1d4ed8;
+  --warn: #f59e0b;
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 20px 60px rgba(0,0,0,0.25);
+}
+
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { height: 100%; }
@@ -66,10 +95,10 @@ main { flex: 1 0 auto; }
   font: inherit;
 }
 .auth-card button[type="submit"] {
-  padding: 10px; background: #111827; color: #fff; border: none;
-  border-radius: 8px; cursor: pointer; font: inherit; font-weight: 600;
+  padding: 10px; background: var(--primary); color: #fff; border: none;
+  border-radius: var(--radius); cursor: pointer; font: inherit; font-weight: 600;
 }
-.auth-card button[type="submit"]:hover { background: #1f2937; }
+.auth-card button[type="submit"]:hover { background: var(--primary-hover); }
 .auth-card .auth-status { margin: 12px 0 0; font-size: 13px; color: #2563eb; min-height: 18px; }
 .auth-card ol { padding-left: 20px; line-height: 1.7; }
 .config-status {
@@ -90,13 +119,21 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px; }
 }
 .toolbar-left, .toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .toolbar button, .toolbar select {
-  padding: 6px 10px; border: 1px solid #d1d5db; background: #fff;
-  border-radius: 6px; cursor: pointer; font: inherit;
+  padding: 6px 12px; border: 1px solid var(--border-strong); background: var(--surface);
+  border-radius: var(--radius-sm); cursor: pointer; font: inherit;
+  color: var(--text);
+  transition: background 0.1s, border-color 0.1s;
 }
-.toolbar button:hover { background: #f9fafb; }
+.toolbar button:hover, .toolbar select:hover {
+  background: var(--surface-soft); border-color: var(--text-muted);
+}
 #period-label { font-weight: 600; margin: 0 8px; min-width: 180px; text-align: center; }
-#btn-export, #btn-export-all { background: #111827; color: #fff; border-color: #111827; }
-#btn-export:hover, #btn-export-all:hover { background: #1f2937; }
+#btn-export, #btn-export-all, #btn-stats-xlsx, #btn-export-ics {
+  background: var(--surface); color: var(--text); border-color: var(--border-strong);
+}
+#btn-export:hover, #btn-export-all:hover, #btn-stats-xlsx:hover, #btn-export-ics:hover {
+  background: var(--surface-soft); border-color: var(--text-muted);
+}
 
 .calendar-canvas {
   background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
@@ -278,10 +315,11 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px; }
 }
 .grid-form button {
   grid-column: 1 / -1;
-  padding: 10px; background: #111827; color: #fff;
-  border: none; border-radius: 6px; cursor: pointer; font: inherit;
+  padding: 10px; background: var(--primary); color: #fff;
+  border: none; border-radius: var(--radius-sm); cursor: pointer; font: inherit;
+  font-weight: 600;
 }
-.grid-form button:hover { background: #1f2937; }
+.grid-form button:hover { background: var(--primary-hover); }
 
 .hint { color: #6b7280; font-size: 13px; }
 .hint code { background: #f3f4f6; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
@@ -310,8 +348,8 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px; }
   padding: 8px 16px; border-radius: 6px;
   border: 1px solid #d1d5db; background: #fff; cursor: pointer; font: inherit;
 }
-#btn-confirm { background: #111827; color: #fff; border-color: #111827; }
-#btn-confirm:hover { background: #1f2937; }
+#btn-confirm { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 600; }
+#btn-confirm:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
 
 .swatch {
   width: 16px; height: 16px; border-radius: 50%;
@@ -472,10 +510,10 @@ textarea.ocr-text {
   padding: 8px 14px; border: 1px solid #d1d5db; border-radius: 6px;
   background: #fff; cursor: pointer; font: inherit;
 }
-.modal-actions button.primary { background: #111827; color: #fff; border-color: #111827; }
-.modal-actions button.primary:hover { background: #1f2937; }
-.modal-actions button.danger { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
-.modal-actions button.danger:hover { background: #fecaca; }
+.modal-actions button.primary { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 600; }
+.modal-actions button.primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+.modal-actions button.danger { background: var(--danger-bg); color: #991b1b; border-color: var(--danger-border); }
+.modal-actions button.danger:hover { background: var(--danger-border); }
 
 /* Mobile responsive — make week grid usable on small screens */
 @media (max-width: 640px) {
@@ -728,26 +766,10 @@ textarea.ocr-text {
 }
 
 #btn-add-personal {
-  background: #fff; color: #2563eb;
+  background: var(--surface); color: var(--primary);
   border-color: #bfdbfe;
 }
-#btn-add-personal:hover { background: #eff6ff; }
-#btn-export, #btn-export-all, #btn-stats-xlsx {
-  background: #111827; color: #fff; border-color: #111827;
-}
-#btn-export:hover, #btn-export-all:hover, #btn-stats-xlsx:hover {
-  background: #1f2937;
-}
-
-.member-card {
-  position: relative;
-  overflow: hidden;
-}
-.member-card::before {
-  content: '';
-  position: absolute; left: 0; top: 0; bottom: 0;
-  width: 4px; background: var(--accent, #e5e7eb);
-}
+#btn-add-personal:hover { background: var(--primary-soft); }
 
 #mm-status {
   padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px;
@@ -800,11 +822,11 @@ textarea.ocr-text {
 }
 .pin-actions button.primary {
   padding: 12px;
-  background: #111827; color: #fff;
-  border: none; border-radius: 8px;
+  background: var(--primary); color: #fff;
+  border: none; border-radius: var(--radius);
   cursor: pointer; font: inherit; font-weight: 600;
 }
-.pin-actions button.primary:hover { background: #1f2937; }
+.pin-actions button.primary:hover { background: var(--primary-hover); }
 .link-button {
   background: none; border: none;
   color: #2563eb; cursor: pointer;
@@ -870,10 +892,10 @@ textarea.ocr-text {
 
 /* ---------- + 스케줄 button ---------- */
 #btn-quick-add.primary {
-  background: #2563eb; color: #fff; border-color: #2563eb;
+  background: var(--primary); color: #fff; border-color: var(--primary);
   font-weight: 600;
 }
-#btn-quick-add.primary:hover { background: #1d4ed8; }
+#btn-quick-add.primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
 
 /* Day cells should look clickable */
 .wg-day-col, .month-grid .day { cursor: pointer; }
