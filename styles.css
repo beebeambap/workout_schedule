@@ -337,7 +337,7 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px; }
 }
 .preview th { background: #f9fafb; position: sticky; top: 0; }
 .preview td input { width: 100%; border: none; padding: 4px; font: inherit; background: transparent; }
-.preview td input:focus { outline: 1px solid #3b82f6; background: #fff; }
+.preview td input:focus { outline: 1px solid var(--primary); background: #fff; }
 .preview tr.warn td { background: #fff7ed; }
 .preview .row-del {
   background: #fee2e2; color: #991b1b; border: none;
@@ -560,8 +560,8 @@ textarea.ocr-text {
 }
 .color-swatch:hover { transform: scale(1.12); }
 .color-swatch.selected {
-  border-color: #111827;
-  box-shadow: 0 0 0 2px #fff inset, 0 0 0 1px #111827;
+  border-color: var(--slate);
+  box-shadow: 0 0 0 2px #fff inset, 0 0 0 1px var(--slate);
 }
 
 /* ---------- Member list (vertical rows) ---------- */
@@ -846,15 +846,18 @@ textarea.ocr-text {
 
 /* ---------- Hybrid color picker: chips + custom ---------- */
 .form-color-row {
-  display: flex; flex-direction: column; gap: 6px;
+  display: flex; flex-direction: column; gap: 8px;
   font-size: 13px;
 }
-.form-color-label { font-size: 13px; }
+.grid-form .form-color-row { grid-column: 1 / -1; }
+.form-color-label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
 .color-picker-wrap {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
 }
 .color-picker-wrap .color-palette {
-  display: flex; flex-wrap: wrap; gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(5, 32px);
+  gap: 8px;
 }
 .color-custom-btn {
   display: inline-flex;

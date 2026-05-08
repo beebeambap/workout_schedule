@@ -15,7 +15,22 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-const COLOR_PALETTE = ['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#06b6d4'];
+// Curated 10-color palette: WCAG AA (≥4.5:1) with white text, perceptually
+// balanced lightness, avoids reds (danger/Sunday) and primary blue (Saturday/CTA).
+const COLOR_PALETTE = [
+  { hex: '#e11d48', name: '산호' },
+  { hex: '#ea580c', name: '귤' },
+  { hex: '#a16207', name: '머스터드' },
+  { hex: '#15803d', name: '숲' },
+  { hex: '#0d9488', name: '민트' },
+  { hex: '#0284c7', name: '하늘' },
+  { hex: '#4f46e5', name: '청보라' },
+  { hex: '#7c3aed', name: '라벤더' },
+  { hex: '#c026d3', name: '자두' },
+  { hex: '#475569', name: '그라파이트' },
+];
+const COLOR_DEFAULT = '#0284c7';
+const COLOR_MIGRATION_KEY = 'lf_color_migration_v1';
 
 const VIEW_STATE_KEY = 'lf_view_state';
 const state = {
@@ -248,6 +263,52 @@ async function commitSessions(arr) {
 }
 
 // ---------- members ----------
+function hexToRgb(hex) {
+  const h = (hex || '').replace('#', '');
+  if (h.length !== 6) return null;
+  const n = parseInt(h, 16);
+  if (Number.isNaN(n)) return null;
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function nearestPaletteColor(hex) {
+  const target = hexToRgb(hex);
+  if (!target) return COLOR_DEFAULT;
+  let best = COLOR_PALETTE[0].hex;
+  let bestDist = Infinity;
+  for (const c of COLOR_PALETTE) {
+    const rgb = hexToRgb(c.hex);
+    const d = (rgb[0] - target[0]) ** 2 + (rgb[1] - target[1]) ** 2 + (rgb[2] - target[2]) ** 2;
+    if (d < bestDist) { bestDist = d; best = c.hex; }
+  }
+  return best;
+}
+async function migrateMemberColors() {
+  if (localStorage.getItem(COLOR_MIGRATION_KEY)) return;
+  const paletteSet = new Set(COLOR_PALETTE.map(c => c.hex.toLowerCase()));
+  const members = Store.members();
+  const toMigrate = members.filter(m => m.color && !paletteSet.has(m.color.toLowerCase()));
+  if (!toMigrate.length) {
+    localStorage.setItem(COLOR_MIGRATION_KEY, '1');
+    return;
+  }
+  console.log('[color-migration] migrating', toMigrate.length, '명');
+  const results = await Promise.all(toMigrate.map(m => {
+    const newColor = nearestPaletteColor(m.color);
+    return Store.updateMember(m.id, {
+      name: m.name,
+      color: newColor,
+      memo: m.memo || '',
+      status: m.status || 'active',
+    }).then(() => true).catch(err => {
+      console.warn('[color-migration] failed for', m.name, err);
+      return false;
+    });
+  }));
+  if (results.every(Boolean)) {
+    localStorage.setItem(COLOR_MIGRATION_KEY, '1');
+  }
+}
+
 function initColorPicker(inputEl, paletteEl) {
   const customBtn = inputEl.closest('.color-custom-btn');
   function sync() {
@@ -264,7 +325,7 @@ function initColorPicker(inputEl, paletteEl) {
     }
   }
   paletteEl.innerHTML = COLOR_PALETTE.map(c =>
-    `<button type="button" class="color-swatch" data-color="${c}" style="background:${c}" title="${c}"></button>`
+    `<button type="button" class="color-swatch" data-color="${c.hex}" style="background:${c.hex}" title="${c.name}" aria-label="${c.name}"></button>`
   ).join('');
   paletteEl.querySelectorAll('.color-swatch').forEach(b => {
     b.addEventListener('click', () => {
@@ -288,7 +349,7 @@ $('#form-member').addEventListener('submit', async (e) => {
   try {
     await Store.ensureMember(name, fd.get('color'), String(fd.get('memo') || '').trim());
     e.target.reset();
-    $('#form-member-color').value = '#3b82f6';
+    $('#form-member-color').value = COLOR_DEFAULT;
     initColorPicker($('#form-member-color'), $('#form-color-palette'));
   } catch (err) {
     alert('저장 오류: ' + err.message);
@@ -1262,6 +1323,7 @@ async function onSignedIn(session) {
     return;
   }
   await maybeMigrateLocal();
+  await migrateMemberColors();
   refreshFilter();
   $('#view-mode').value = state.mode;
   switchView(state.view);
