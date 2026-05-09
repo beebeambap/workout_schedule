@@ -37,6 +37,7 @@ function rowToSession(r) {
     date: r.date,
     startTime: typeof r.start_time === 'string' ? r.start_time.slice(0, 5) : r.start_time,
     durationMin: r.duration_min,
+    status: r.status || 'scheduled',
   };
 }
 
@@ -173,6 +174,20 @@ export const Store = {
     if (error) throw error;
     cache.sessions = cache.sessions.filter(s => s.id !== id);
     notify();
+  },
+
+  async updateSession(id, patch) {
+    const cur = cache.sessions.find(x => x.id === id);
+    if (!cur) return null;
+    const update = {};
+    if (patch.status != null) update.status = patch.status;
+    if (!Object.keys(update).length) return cur;
+    const { data, error } = await sb.from('sessions').update(update).eq('id', id).select().single();
+    if (error) throw error;
+    const s = rowToSession(data);
+    upsertCache(cache.sessions, s);
+    notify();
+    return s;
   },
 };
 

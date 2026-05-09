@@ -718,6 +718,30 @@ function openSessionModal(sessionId) {
     };
   }
 
+  // Status controls (예정 / 완료 / 취소) — only for member sessions
+  $('#ms-status-section').hidden = isPersonal;
+  const curStatus = s.status || 'scheduled';
+  $('#ms-status-controls').innerHTML = [
+    { v: 'scheduled', l: '예정' },
+    { v: 'completed', l: '완료' },
+    { v: 'canceled', l: '취소' },
+  ].map(o => `<button type="button" class="ms-status-btn${curStatus === o.v ? ' active' : ''}" data-status="${o.v}">${o.l}</button>`).join('');
+  $('#ms-status-controls').querySelectorAll('.ms-status-btn').forEach(b => {
+    b.addEventListener('click', async () => {
+      const next = b.dataset.status;
+      if (next === curStatus) return;
+      try {
+        await Store.updateSession(s.id, { status: next });
+        $('#modal-session').close();
+        flash(next === 'completed' ? '완료 처리되었습니다.' : next === 'canceled' ? '취소 처리되었습니다.' : '예정으로 되돌렸습니다.');
+      } catch (err) {
+        console.error('[session-status] error:', err);
+        alert('상태 저장 오류: ' + err.message +
+          '\n\nSupabase에 sessions.status 컬럼이 없으면 docs/SUPABASE_SETUP.md의 마이그레이션 SQL을 실행하세요.');
+      }
+    });
+  });
+
   $('#ms-delete').onclick = async () => {
     if (!confirm('이 일정을 삭제할까요?')) return;
     try {
