@@ -153,6 +153,7 @@ export function renderWeek(container, anchor, sessions, members, fitToSessions =
 
     const laid = layoutEventsInColumn(dayEvs);
     const baseMin = hStart * 60;
+    const isPastDay = dStr < today;
     for (const e of laid) {
       const m = memberMap[e.memberId];
       const isPersonal = !m;
@@ -167,8 +168,13 @@ export function renderWeek(container, anchor, sessions, members, fitToSessions =
         ? `<span class="ev-time">${escapeHtml(e.startTime)}~${escapeHtml(endTime)}</span>`
         : `<span class="ev-name">${escapeHtml(display)}</span><span class="ev-time">${escapeHtml(e.startTime)}</span>`;
       const sid = escapeHtml(e.id || '');
-      const evCls = 'wg-event' + (isPersonal ? ' wg-event-personal' : '');
-      html += `<div class="${evCls}" data-session-id="${sid}" style="top:${top}px;height:${height}px;left:calc(${leftPct}% + 1px);width:calc(${widthPct}% - 2px);background:${color}">${label}</div>`;
+      const status = e.status || 'scheduled';
+      const evCls = ['wg-event'];
+      if (isPersonal) evCls.push('wg-event-personal');
+      if (isPastDay) evCls.push('is-past');
+      if (status === 'canceled') evCls.push('is-canceled');
+      if (status === 'completed') evCls.push('is-completed');
+      html += `<div class="${evCls.join(' ')}" data-session-id="${sid}" style="top:${top}px;height:${height}px;left:calc(${leftPct}% + 1px);width:calc(${widthPct}% - 2px);background:${color}">${label}</div>`;
     }
 
     html += `</div>`;
@@ -238,6 +244,7 @@ export function renderMonth(container, anchor, sessions, members, opts = {}) {
     if (dStr === today) cls += ' today';
     cls += ' ' + dayClass(d);
     const holiday = lookupHoliday(dStr);
+    const isPastDay = dStr < today;
     const evs = sessions
       .filter(s => s.date === dStr)
       .sort((a, b) => a.startTime.localeCompare(b.startTime))
@@ -250,8 +257,13 @@ export function renderMonth(container, anchor, sessions, members, opts = {}) {
           ? `${escapeHtml(s.startTime)}~${escapeHtml(computeEndTime(s.startTime, s.durationMin))}`
           : `${escapeHtml(display)} ${escapeHtml(s.startTime)}`;
         const sid = escapeHtml(s.id || '');
-        const evCls = 'ev' + (isPersonal ? ' ev-personal' : '');
-        return `<span class="${evCls}" data-session-id="${sid}" style="background:${color}">${label}</span>`;
+        const status = s.status || 'scheduled';
+        const evCls = ['ev'];
+        if (isPersonal) evCls.push('ev-personal');
+        if (isPastDay) evCls.push('is-past');
+        if (status === 'canceled') evCls.push('is-canceled');
+        if (status === 'completed') evCls.push('is-completed');
+        return `<span class="${evCls.join(' ')}" data-session-id="${sid}" style="background:${color}">${label}</span>`;
       }).join('');
     const holidayLine = holiday ? `<span class="day-holiday">${escapeHtml(holiday)}</span>` : '';
     html += `<div class="${cls}" data-date="${dStr}"><span class="day-num">${d.getDate()}</span>${holidayLine}${evs}</div>`;

@@ -553,7 +553,7 @@ textarea.ocr-text {
   display: flex; flex-wrap: wrap; gap: 8px;
 }
 .color-swatch {
-  width: 32px; height: 32px; border-radius: 50%;
+  width: 28px; height: 28px; border-radius: 50%;
   border: 2px solid transparent; cursor: pointer; padding: 0;
   transition: transform 0.1s;
   box-shadow: 0 0 0 1px rgba(0,0,0,0.06);
@@ -743,6 +743,69 @@ textarea.ocr-text {
   border: 1px dashed rgba(255,255,255,0.6);
 }
 
+/* ---------- Session status: past / completed / canceled ---------- */
+.wg-event.is-past, .month-grid .ev.is-past { opacity: 0.55; }
+.wg-event.is-completed, .month-grid .ev.is-completed { opacity: 1; }
+.wg-event.is-completed::after,
+.month-grid .ev.is-completed::after {
+  content: '✓';
+  position: absolute; top: 2px; right: 4px;
+  font-size: 11px; font-weight: 800;
+  color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  pointer-events: none;
+}
+.month-grid .ev { position: relative; }
+.month-grid .ev.is-completed { padding-right: 16px; }
+.wg-event.is-canceled, .month-grid .ev.is-canceled {
+  opacity: 0.5;
+  text-decoration: line-through;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(0,0,0,0) 0, rgba(0,0,0,0) 4px,
+    rgba(0,0,0,0.18) 4px, rgba(0,0,0,0.18) 5px
+  ) !important;
+}
+
+/* Session status buttons in modal */
+.ms-status-section {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin: 0 0 14px;
+}
+.ms-status-label {
+  font-size: 12px; color: var(--text-muted);
+  font-weight: 600; flex-shrink: 0;
+}
+.ms-status-controls {
+  display: flex; gap: 6px; flex: 1;
+}
+.ms-status-btn {
+  flex: 1; padding: 7px 4px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  cursor: pointer; font: inherit; font-size: 13px;
+  font-weight: 500;
+  transition: all 0.1s;
+}
+.ms-status-btn:hover:not(.active) {
+  background: var(--surface-soft);
+  border-color: var(--text-muted);
+}
+.ms-status-btn.active[data-status="scheduled"] {
+  background: var(--slate); color: #fff; border-color: var(--slate);
+}
+.ms-status-btn.active[data-status="completed"] {
+  background: #16a34a; color: #fff; border-color: #16a34a;
+}
+.ms-status-btn.active[data-status="canceled"] {
+  background: var(--danger); color: #fff; border-color: var(--danger);
+}
+
 /* ---------- Polish: topbar + cards + buttons ---------- */
 .topbar {
   backdrop-filter: saturate(180%) blur(8px);
@@ -846,31 +909,42 @@ textarea.ocr-text {
 
 /* ---------- Hybrid color picker: chips + custom ---------- */
 .form-color-row {
-  display: flex; flex-direction: column; gap: 8px;
-  font-size: 13px;
+  display: flex; flex-direction: row; align-items: center;
+  gap: 14px; font-size: 13px; flex-wrap: wrap;
 }
 .grid-form .form-color-row { grid-column: 1 / -1; }
-.form-color-label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+.form-color-label {
+  font-size: 13px; color: var(--text-muted); font-weight: 500;
+  min-width: 36px;
+}
 .color-picker-wrap {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
 }
 .color-picker-wrap .color-palette {
   display: grid;
-  grid-template-columns: repeat(5, 32px);
-  gap: 8px;
+  grid-template-columns: repeat(10, 28px);
+  gap: 6px;
+}
+@media (max-width: 480px) {
+  .color-picker-wrap .color-palette {
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    gap: 5px;
+    width: 100%;
+  }
+  .color-picker-wrap .color-swatch { width: 100%; height: 28px; }
 }
 .color-custom-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  width: 32px; height: 32px;
+  width: 28px; height: 28px;
   border-radius: 50%;
-  background: #f9fafb;
+  background: var(--surface-soft);
   border: 2px dashed #cbd5e1;
   cursor: pointer;
-  font-size: 14px;
-  color: #6b7280;
+  font-size: 12px;
+  color: var(--text-muted);
   overflow: hidden;
   flex-shrink: 0;
   transition: border-color 0.1s, background 0.1s;
