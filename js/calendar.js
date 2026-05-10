@@ -174,6 +174,8 @@ export function renderWeek(container, anchor, sessions, members, fitToSessions =
       if (isPastDay) evCls.push('is-past');
       if (status === 'canceled') evCls.push('is-canceled');
       if (status === 'completed') evCls.push('is-completed');
+      if (status === 'noshow_charged') evCls.push('is-noshow-charged');
+      if (status === 'noshow_free') evCls.push('is-noshow-free');
       html += `<div class="${evCls.join(' ')}" data-session-id="${sid}" style="top:${top}px;height:${height}px;left:calc(${leftPct}% + 1px);width:calc(${widthPct}% - 2px);background:${color}">${label}</div>`;
     }
 
@@ -263,6 +265,8 @@ export function renderMonth(container, anchor, sessions, members, opts = {}) {
         if (isPastDay) evCls.push('is-past');
         if (status === 'canceled') evCls.push('is-canceled');
         if (status === 'completed') evCls.push('is-completed');
+        if (status === 'noshow_charged') evCls.push('is-noshow-charged');
+        if (status === 'noshow_free') evCls.push('is-noshow-free');
         return `<span class="${evCls.join(' ')}" data-session-id="${sid}" style="background:${color}">${label}</span>`;
       }).join('');
     const holidayLine = holiday ? `<span class="day-holiday">${escapeHtml(holiday)}</span>` : '';

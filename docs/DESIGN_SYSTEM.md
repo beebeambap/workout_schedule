@@ -53,7 +53,21 @@
 | `--danger-border` | `#fecaca` | 위험 버튼/알림 테두리 |
 | `--info-bg` | `#dbeafe` | 정보 배지 배경 (연장 회원) |
 | `--info-text` | `#1d4ed8` | 정보 배지 텍스트 |
-| `--warn` | `#f59e0b` | 경고 표시 (현재 직접 사용 적음) |
+| `--success` | `#16a34a` | 완료 상태, 성공 토스트 |
+| `--success-bg` | `#dcfce7` | 완료 배지 배경 |
+| `--success-text` | `#166534` | 완료 배지 텍스트 |
+| `--warn` | `#f59e0b` | 노쇼 외곽선, 경고 |
+| `--warn-bg` | `#fef3c7` | 오늘 헤더 셀, 노쇼/경고 배지 배경 |
+| `--warn-text` | `#92400e` | 노쇼/경고 배지 텍스트 |
+
+### 1-6. 포커스 (Keyboard a11y)
+
+| 토큰 | 값 | 용도 |
+|---|---|---|
+| `--focus-outline` | `2px solid var(--primary)` | 포커스 외곽선 (`:focus-visible` 한정) |
+| `--focus-ring` | `0 0 0 4px rgba(37,99,235,0.18)` | 외곽선 바깥 부드러운 글로우 |
+
+> 마우스 클릭에서는 포커스 링이 보이지 않도록 `:focus-visible`로만 적용. 키보드 탭 이동 시에만 표시됩니다.
 
 > **의미 색상 충돌 방지**: 빨강(`--danger`)·파랑(`--primary`)은 의미를 가집니다.
 > 회원 컬러칩 팔레트에 이 두 색을 그대로 쓰지 않고, 유사하지만 다른 색조를 배정합니다.
@@ -87,6 +101,16 @@
 > **개인 일정(트레이너 자신)**: 회원 없는 세션은 `#6b7280`(회색) 고정.
 > 팔레트 밖의 색이므로 항상 구별됩니다.
 
+### 2-1. 향후 확장 계획 (LATER)
+
+11명 이상의 회원 운영 시 색 충돌이 시작됩니다. `docs/color-chip-ideas.html`에서 검토한 방향대로 확장합니다.
+
+- **휴(Hue) → 명도(Shade) 2단 선택**: 기존 10휴는 그대로 유지, 각 휴를 **10단계 명도**로 확장 → **10휴 × 10명도 = 100색 슬롯**.
+- **자동 배정**: 해시 단순 모듈로 → "가장 적게 쓰인 휴 → 그 안에서 가장 적게 쓰인 명도" 라운드로빈으로 변경 (결정적·마이그레이션 안전).
+- **이중 부호화 (Concept C 병행)**: 색만으로는 식별이 어려우므로 회원 이니셜 모노그램을 색 칩 안에 같이 표시. 색약·흑백 인쇄·좁은 캘린더 블록에서도 식별 유지.
+
+이 확장은 NOW 우선순위 작업 완료 후 별도 스프린트에서 진행합니다.
+
 ---
 
 ## 3. 타이포그래피
@@ -94,7 +118,7 @@
 | 요소 | 폰트/크기 | 비고 |
 |---|---|---|
 | 기본 폰트 | `'Noto Sans KR', system-ui, sans-serif` | 한글 최적화 |
-| 본문 | 14px (브라우저 기본) | `--text` |
+| 본문 | 15px / line-height 1.6 | `--text` (한글 가독성 고려) |
 | 힌트·보조 | 13px | `--text-muted` |
 | 배지·레이블 | 10~12px | `letter-spacing: 0.2–0.5px` |
 | 모달 제목 | 18px, `font-weight: 700` | |
@@ -128,7 +152,7 @@
 
 ## 6. 컴포넌트 패턴
 
-### 6-1. 버튼 계층
+### 6-1. 버튼 계층 (variant)
 
 | 변형 | 클래스/셀렉터 | 배경 | 텍스트 | 테두리 | 용도 |
 |---|---|---|---|---|---|
@@ -138,8 +162,17 @@
 | **Slate(Dark)** | `.active` (nav) | `--slate` | 흰색 | — | 활성 탭 |
 | **Ghost** | `.link-button` | 투명 | `--primary` | — | 부가 링크 |
 
+### 6-1b. 버튼 사이즈 (scale, opt-in)
+
+| 클래스 | 패딩 | 폰트 | 최소 높이 | 용도 |
+|---|---|---|---|---|
+| `.btn-sm` | 4×10px | 12px | 28px | 행 내 액션, 인라인 |
+| `.btn-md` | 8×14px | 14px | 36px | 일반 (현재 기본 톤과 동일) |
+| `.btn-lg` | 11×18px | 15px / 600 | 44px | 모바일 주요 CTA |
+| `.btn-mobile-cta` | — | — | ≤640px에서 자동 44px | 데스크톱 md → 모바일 lg 전환 |
+
 > 모달 액션 버튼: `.modal-actions button` 기본은 Secondary.
-> `.primary` 클래스를 추가하면 Primary.
+> `.primary` 클래스를 추가하면 Primary. 사이즈 클래스는 variant와 조합해 사용 (`.primary.btn-lg`).
 
 ### 6-2. 인풋
 
@@ -208,21 +241,29 @@ font: inherit; background: #fff;
 
 ## 7. 세션 상태 시각화
 
-| 상태 | DB 값 | 클래스 | 시각 처리 |
-|---|---|---|---|
-| 예정 | `scheduled` | (기본) | — |
-| 완료 | `completed` | `.is-completed` | opacity 1, `::after` ✓ 배지 (우상단) |
-| 취소 | `canceled` | `.is-canceled` | opacity 0.5, 취소선, 대각 해칭 패턴 |
-| 지난 날짜 | — | `.is-past` | opacity 0.55 (취소/완료 아닌 경우만) |
+| 상태 | DB 값 | 클래스 | 시각 처리 | 회차 차감 | 매출 인식 |
+|---|---|---|---|---|---|
+| 예정 | `scheduled` | (기본) | — | — | — |
+| 완료 | `completed` | `.is-completed` | opacity 1, `::after` ✓ 배지 (우상단) | 차감 | 인식 |
+| 취소 | `canceled` | `.is-canceled` | opacity 0.5, 취소선, 대각 해칭 패턴 | 비차감 | — |
+| 노쇼(차감) | `noshow_charged` | `.is-noshow-charged` | warn 외곽선 + ! 배지 | **차감** | 인식 |
+| 노쇼(면제) | `noshow_free` | `.is-noshow-free` | warn 외곽선 + ! 배지 + 점선 밑줄 | **비차감** | — |
+| 지난 날짜 | — | `.is-past` | opacity 0.55 (위 상태 미적용 시) | — | — |
 
 상태 버튼(모달 내):
 ```
-.ms-status-section  → 회색 배경 섹션
-  .ms-status-btn    → flex 버튼 3개
-    active[scheduled]  → --slate (어두운)
-    active[completed]  → #16a34a (초록)
-    active[canceled]   → --danger (빨강)
+.ms-status-section
+  .ms-status-row              → 메인 4개 버튼
+    [예정] [완료] [취소] [노쇼]
+        active[scheduled]  → --slate
+        active[completed]  → --success
+        active[canceled]   → --danger
+        active[noshow]     → --warn
+  .ms-status-sub (노쇼 활성화 시 노출)
+    [차감] [면제]             → DB 값: noshow_charged | noshow_free
 ```
+
+> **노쇼를 둘로 나눈 이유**: 정산·잔여 횟수 처리가 다르기 때문입니다. 약관에 따라 회차를 차감하는 경우(`noshow_charged`)와 트레이너 재량으로 면제한 경우(`noshow_free`)를 분리해 통계·환불 로직에서 별도로 처리할 수 있습니다.
 
 ---
 
