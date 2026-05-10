@@ -265,8 +265,8 @@ export function renderMonth(container, anchor, sessions, members, opts = {}) {
         const color = isPersonal ? '#6b7280' : (m?.color || '#6b7280');
         const display = isPersonal ? (s.title || '내 일정') : (m?.name || '?');
         const label = hideMemberName
-          ? `${escapeHtml(s.startTime)}~${escapeHtml(computeEndTime(s.startTime, s.durationMin))}`
-          : `${escapeHtml(display)} ${escapeHtml(s.startTime)}`;
+          ? `<span class="ev-time">${escapeHtml(s.startTime)}~${escapeHtml(computeEndTime(s.startTime, s.durationMin))}</span>`
+          : `<span class="ev-name">${escapeHtml(display)}</span><span class="ev-time"> ${escapeHtml(s.startTime)}</span>`;
         const sid = escapeHtml(s.id || '');
         const status = s.status || 'scheduled';
         const evCls = ['ev'];
