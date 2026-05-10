@@ -19,6 +19,11 @@ if (!sbReady) {
 // "lock ... was released because another request stole it". For a single
 // trainer using a few tabs, a simple in-process mutex is sufficient and
 // avoids the Web Locks race entirely.
+//
+// Defensive timeout: if a lock-holding callback hangs (e.g. a stuck network
+// request to Supabase auth), we force-release after 30s so subsequent app
+// operations don't pile up behind it forever.
+const LOCK_TIMEOUT_MS = 30_000;
 const _locks = new Map();
 async function inProcessLock(name, _timeout, fn) {
   const prev = _locks.get(name) || Promise.resolve();
@@ -28,7 +33,13 @@ async function inProcessLock(name, _timeout, fn) {
   _locks.set(name, prev.catch(() => {}).then(() => slot));
   try {
     await prev.catch(() => {});
-    return await fn();
+    return await Promise.race([
+      fn(),
+      new Promise((_, rej) => setTimeout(
+        () => rej(new Error(`Supabase auth lock timeout (${LOCK_TIMEOUT_MS / 1000}s)`)),
+        LOCK_TIMEOUT_MS
+      )),
+    ]);
   } finally {
     release();
   }
