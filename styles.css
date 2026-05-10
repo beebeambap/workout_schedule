@@ -246,6 +246,13 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px; }
 .wg-hour-line.wg-pm {
   border-top: 2px solid #cbd5e1;
 }
+.wg-hour-line.wg-midnight {
+  border-top: 2px dashed #a5b4fc;
+}
+.wg-hour-label.wg-label-midnight {
+  color: #818cf8;
+  font-weight: 600;
+}
 .wg-event {
   position: absolute;
   display: flex;

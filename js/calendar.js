@@ -1,9 +1,11 @@
 import { lookupHoliday } from './holidays.js';
 
 const DOW_KR = ['일', '월', '화', '수', '목', '금', '토'];
-const FULL_START = 0;
-const FULL_END = 24; // on-screen always shows full 24h
+const FULL_START = 6;
+const FULL_END = 28;  // 06:00–04:00 next day (22-hour view)
+const WRAP_THRESHOLD = FULL_END - 24; // hours 0–3 displayed after 23:00
 export const HOUR_HEIGHT = 56; // pixels per hour
+export const CALENDAR_H_START = FULL_START; // used by click-time inference in app.js
 
 function dayClass(date) {
   // returns extra class names based on day of week / holiday
@@ -42,7 +44,8 @@ const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => (
 
 function toMin(t) {
   const [h, m] = t.split(':').map(Number);
-  return h * 60 + m;
+  // 0:00–3:59 are "late night" — displayed after 23:00 at the bottom
+  return h < WRAP_THRESHOLD ? (h + 24) * 60 + m : h * 60 + m;
 }
 
 // Assigns laneIdx and totalLanes to events based on time overlap clusters.
@@ -94,8 +97,8 @@ export function renderWeek(container, anchor, sessions, members, fitToSessions =
   if (exportMode && fitToSessions && weekSessions.length) {
     const startMins = weekSessions.map(s => toMin(s.startTime));
     const endMins = weekSessions.map(s => toMin(s.startTime) + (s.durationMin || 50));
-    hStart = Math.max(0, Math.floor(Math.min(...startMins) / 60));
-    hEnd = Math.min(24, Math.ceil(Math.max(...endMins) / 60));
+    hStart = Math.max(FULL_START, Math.floor(Math.min(...startMins) / 60));
+    hEnd = Math.min(FULL_END, Math.ceil(Math.max(...endMins) / 60));
     if (hEnd <= hStart) hEnd = hStart + 1;
   }
 
@@ -129,7 +132,8 @@ export function renderWeek(container, anchor, sessions, members, fitToSessions =
   // Hour-label column
   html += `<div class="wg-hour-col">`;
   for (let h = hStart; h < hEnd; h++) {
-    html += `<div class="wg-hour-label" data-hour="${h}" style="height:${HOUR_HEIGHT}px">${pad(h)}:00</div>`;
+    const labelH = h >= 24 ? h - 24 : h;
+    html += `<div class="wg-hour-label${h === 24 ? ' wg-label-midnight' : ''}" data-hour="${h}" style="height:${HOUR_HEIGHT}px">${pad(labelH)}:00</div>`;
   }
   html += `</div>`;
 
@@ -142,7 +146,8 @@ export function renderWeek(container, anchor, sessions, members, fitToSessions =
     for (let h = hStart + 1; h < hEnd; h++) {
       const top = (h - hStart) * HOUR_HEIGHT;
       const isPm = (h === 12 && showPmDivider);
-      html += `<div class="wg-hour-line${isPm ? ' wg-pm' : ''}" style="top:${top}px"></div>`;
+      const isMidnight = h === 24;
+      html += `<div class="wg-hour-line${isPm ? ' wg-pm' : ''}${isMidnight ? ' wg-midnight' : ''}" style="top:${top}px"></div>`;
     }
 
     const dayEvs = sessions
@@ -202,7 +207,8 @@ function appendNowLine(container, days, hStart, hEnd) {
   const dayIdx = days.findIndex(d => ymd(d) === todayStr);
   if (dayIdx < 0) return;
 
-  const totalMin = now.getHours() * 60 + now.getMinutes();
+  let totalMin = now.getHours() * 60 + now.getMinutes();
+  if (now.getHours() < WRAP_THRESHOLD) totalMin += 24 * 60;
   const baseMin = hStart * 60;
   const endMin = hEnd * 60;
   if (totalMin < baseMin || totalMin >= endMin) return;
