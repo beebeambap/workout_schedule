@@ -7,7 +7,7 @@ import { sbReady, status as sbStatus } from './supabase.js';
 import { getSession, sendMagicLink, signOut, onAuthChange, updateUserMetadata } from './auth.js';
 import { preloadHolidays, ensureYearLoaded } from './holidays.js';
 import * as Pin from './pin.js';
-import { COLOR_PALETTE, COLOR_DEFAULT } from './palette.js';
+import { COLOR_PALETTE, COLOR_DEFAULT, COLOR_SLOTS } from './palette.js';
 
 // Register service worker (PWA)
 if ('serviceWorker' in navigator) {
@@ -301,9 +301,12 @@ function nearestPaletteColor(hex) {
 }
 async function migrateMemberColors() {
   if (localStorage.getItem(COLOR_MIGRATION_KEY)) return;
-  const paletteSet = new Set(COLOR_PALETTE.map(c => c.hex.toLowerCase()));
+  const validHexes = new Set([
+    ...COLOR_PALETTE.map(c => c.hex.toLowerCase()),
+    ...COLOR_SLOTS.map(s => s.hex.toLowerCase()),
+  ]);
   const members = Store.members();
-  const toMigrate = members.filter(m => m.color && !paletteSet.has(m.color.toLowerCase()));
+  const toMigrate = members.filter(m => m.color && !validHexes.has(m.color.toLowerCase()));
   if (!toMigrate.length) {
     localStorage.setItem(COLOR_MIGRATION_KEY, '1');
     return;
@@ -341,14 +344,13 @@ function initColorPicker(inputEl, paletteEl) {
       customBtn.style.background = (!inPalette && v) ? v : '';
     }
   }
-  paletteEl.innerHTML = COLOR_PALETTE.map(c =>
-    `<button type="button" class="color-swatch" data-color="${c.hex}" style="background:${c.hex}" title="${c.name}" aria-label="${c.name}"></button>`
-  ).join('');
+  // 10×10 grid: rows = shades (dark→light), cols = hues (left→right)
+  const rows = Array.from({length: 10}, (_, si) => COLOR_SLOTS.filter(s => s.shadeIndex === si));
+  paletteEl.innerHTML = rows.flatMap(row => row.map(slot =>
+    `<button type="button" class="color-swatch${slot.aa ? '' : ' no-aa'}" data-color="${slot.hex}" style="background:${slot.hex}" title="${slot.name}" aria-label="${slot.name}"></button>`
+  )).join('');
   paletteEl.querySelectorAll('.color-swatch').forEach(b => {
-    b.addEventListener('click', () => {
-      inputEl.value = b.dataset.color;
-      sync();
-    });
+    b.addEventListener('click', () => { inputEl.value = b.dataset.color; sync(); });
   });
   if (inputEl._cpSync) inputEl.removeEventListener('input', inputEl._cpSync);
   inputEl._cpSync = sync;
