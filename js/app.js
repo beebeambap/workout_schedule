@@ -461,7 +461,10 @@ function initColorPicker(inputEl, paletteEl) {
       if (hd.shades.some(s => s.hex.toLowerCase() === v)) { matchedHue = hd.hueIndex; break; }
     }
     hueRow.querySelectorAll('.color-hue').forEach((b, i) => {
-      b.classList.toggle('active', i === matchedHue);
+      const isActive = i === matchedHue;
+      b.classList.toggle('active', isActive);
+      // 선택된 칩은 실제 선택된 명도 색상으로 배경 업데이트 → 칩과 스와치 일치
+      b.style.background = isActive ? (inputEl.value || COLOR_HUES[i].baseHex) : COLOR_HUES[i].baseHex;
     });
     if (swatch) swatch.style.background = inputEl.value || COLOR_DEFAULT;
     if (_shadePopup && !_shadePopup.hidden) {

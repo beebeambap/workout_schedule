@@ -104,36 +104,38 @@
     </div>
 
     <div id="tab-typing" class="tab active">
-      <form id="form-typing" class="grid-form">
-        <label>회원명<input name="name" required placeholder="예: 김민수"></label>
-        <label>날짜<input type="date" name="date" required></label>
-        <label>시작 시간<input type="time" name="start" required></label>
-        <label>소요(분)<input type="number" name="duration" value="50" min="10" step="5" required></label>
-        <button type="submit">미리보기에 추가</button>
-      </form>
+      <div class="import-section">
+        <form id="form-typing" class="grid-form">
+          <label>회원명<input name="name" required placeholder="예: 김민수"></label>
+          <label>날짜<input type="date" name="date" required></label>
+          <label>시작 시간<input type="time" name="start" required></label>
+          <label>소요(분)<input type="number" name="duration" value="50" min="10" step="5" required></label>
+          <button type="submit" class="primary">미리보기에 추가</button>
+        </form>
+      </div>
     </div>
 
     <div id="tab-csv" class="tab">
-      <p class="hint">헤더: <code>member_name, date, start_time, duration_min</code> (또는 한국어 <code>회원명, 날짜, 시작시간, 소요시간</code>)</p>
-      <div class="row-actions">
-        <button type="button" id="btn-sample-csv">샘플 CSV 다운로드</button>
+      <div class="import-section">
+        <p class="hint">헤더 형식: <code>member_name, date, start_time, duration_min</code><br>한국어도 지원: <code>회원명, 날짜, 시작시간, 소요시간</code></p>
+        <label class="import-file-label">
+          <span>CSV 파일 선택</span>
+          <input type="file" id="file-csv" accept=".csv,text/csv">
+        </label>
+        <div class="import-actions">
+          <button type="button" id="btn-sample-csv">샘플 CSV 다운로드</button>
+        </div>
       </div>
-      <input type="file" id="file-csv" accept=".csv,text/csv">
     </div>
 
     <div id="tab-text" class="tab">
-      <p class="hint">날짜는 한 줄, 그 아래 회원명과 시간. 날짜는 <code>2026-05-04</code>, <code>260504</code>, <code>2026년 5월 4일</code> 모두 인식합니다.</p>
-      <textarea id="text-input" class="ocr-text" rows="10"
-        placeholder="예시:
-260504
-김민수 09:00
-박지영 10:30
-
-260506
-김민수 09:00
-이도윤 18:00"></textarea>
-      <div class="row-actions">
-        <button type="button" id="btn-text-parse">미리보기에 추가</button>
+      <div class="import-section">
+        <p class="hint">날짜를 한 줄에 쓰고 그 아래 회원명과 시간을 입력하세요.<br><code>2026-05-04</code> · <code>260504</code> · <code>2026년 5월 4일</code> 모두 인식합니다.</p>
+        <textarea id="text-input" class="import-textarea" rows="9"
+          placeholder="260504&#10;김민수 09:00&#10;박지영 10:30&#10;&#10;260506&#10;김민수 09:00&#10;이도윤 18:00"></textarea>
+        <div class="import-actions">
+          <button type="button" id="btn-text-parse" class="primary">미리보기에 추가</button>
+        </div>
       </div>
     </div>
 
