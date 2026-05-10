@@ -14,6 +14,13 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('service-worker.js').catch((e) => console.warn('SW register failed', e));
   });
+  // 새 SW가 활성화되면 페이지 자동 새로고침 → 캐시된 구버전 CSS/JS 즉시 갱신
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
 }
 
 const COLOR_MIGRATION_KEY = 'lf_color_migration_v2';
@@ -307,10 +314,8 @@ async function migrateMemberColors() {
   }
 }
 
-// 컬러 피커: 10휴 행 + 클릭 시 선택된 휴의 10셰이드만 disclosure로 펼침.
+// 컬러 피커: 10휴 행(5×2) + 클릭 시 선택된 휴의 10셰이드만 disclosure로 펼침.
 function initColorPicker(inputEl, paletteEl) {
-  const customBtn = inputEl.closest('.color-custom-btn');
-
   paletteEl.classList.add('color-picker');
   paletteEl.innerHTML = `
     <div class="color-hue-row" role="radiogroup" aria-label="컬러 선택">
@@ -383,11 +388,9 @@ function initColorPicker(inputEl, paletteEl) {
   function sync() {
     const v = (inputEl.value || '').toLowerCase();
     let matchedHue = -1;
-    let inPalette = false;
     for (const hd of COLOR_HUES) {
       if (hd.shades.some(s => s.hex.toLowerCase() === v)) {
         matchedHue = hd.hueIndex;
-        inPalette = true;
         break;
       }
     }
@@ -398,10 +401,6 @@ function initColorPicker(inputEl, paletteEl) {
       shadePanel.querySelectorAll('.color-shade').forEach(b => {
         b.classList.toggle('selected', b.dataset.color.toLowerCase() === v);
       });
-    }
-    if (customBtn) {
-      customBtn.classList.toggle('custom-active', !inPalette && !!v);
-      customBtn.style.background = (!inPalette && v) ? v : '';
     }
   }
 
