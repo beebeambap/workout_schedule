@@ -231,14 +231,43 @@ $('#btn-cancel').addEventListener('click', () => {
   $('#preview').classList.add('hidden');
 });
 
-function withTimeout(promise, ms, label) {
-  return Promise.race([
-    promise,
-    new Promise((_, rej) => setTimeout(
-      () => rej(new Error(`${label} 응답 없음 (${ms / 1000}s 타임아웃). 네트워크 또는 Supabase 상태를 확인해주세요.`)),
-      ms
-    )),
-  ]);
+// Run an async factory with a timeout and automatic retry on failure.
+// Use a factory (not a Promise) so we can re-invoke on retry. The factory
+// is called fresh each attempt, which means each retry creates a brand-new
+// network request — safe for idempotent reads, but may create duplicates
+// on writes if the first request actually succeeded after the timeout
+// (acceptable: the user can delete the duplicate manually).
+async function withRetry(factory, opts = {}) {
+  const {
+    timeoutMs = 30_000,
+    label = '요청',
+    attempts = 2,
+    backoffMs = 1500,
+    onRetry = null,
+  } = opts;
+  let lastErr;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await Promise.race([
+        factory(),
+        new Promise((_, rej) => setTimeout(
+          () => rej(new Error(`${label} 응답 없음 (${timeoutMs / 1000}s)`)),
+          timeoutMs
+        )),
+      ]);
+    } catch (err) {
+      lastErr = err;
+      console.warn(`[${label}] 시도 ${i}/${attempts} 실패:`, err?.message || err);
+      if (i < attempts) {
+        if (onRetry) try { onRetry(i + 1, attempts); } catch {}
+        await new Promise(r => setTimeout(r, backoffMs));
+      }
+    }
+  }
+  throw new Error(
+    `${label} 실패 (${attempts}회 시도 후): ${lastErr?.message || lastErr}\n\n` +
+    '네트워크 상태를 확인하거나 페이지를 새로고침 해보세요.'
+  );
 }
 
 async function commitSessions(arr) {
@@ -249,7 +278,9 @@ async function commitSessions(arr) {
   for (let i = 0; i < valid.length; i++) {
     const s = valid[i];
     console.log(`[commit] (${i + 1}/${valid.length}) ensureMember`, s.name);
-    const m = await withTimeout(Store.ensureMember(s.name), 15_000, `회원 등록 (${s.name})`);
+    const m = await withRetry(() => Store.ensureMember(s.name), {
+      label: `회원 등록 (${s.name})`,
+    });
     enriched.push({
       memberId: m.id,
       date: s.date,
@@ -258,7 +289,7 @@ async function commitSessions(arr) {
     });
   }
   console.log('[commit] addSessions', enriched.length);
-  await withTimeout(Store.addSessions(enriched), 15_000, '세션 등록');
+  await withRetry(() => Store.addSessions(enriched), { label: '세션 등록' });
   console.log('[commit] done');
 }
 
@@ -664,12 +695,12 @@ $('#qa-save').addEventListener('click', async () => {
   const orig = btn.textContent;
   btn.disabled = true;
   btn.textContent = '저장 중...';
+  const onRetry = () => { btn.textContent = '재시도 중...'; };
   try {
-    const m = await withTimeout(Store.ensureMember(name), 15_000, '회원 등록');
-    await withTimeout(
-      Store.addSessions([{ memberId: m.id, date, startTime: start, durationMin: duration }]),
-      15_000,
-      '세션 등록'
+    const m = await withRetry(() => Store.ensureMember(name), { label: '회원 등록', onRetry });
+    await withRetry(
+      () => Store.addSessions([{ memberId: m.id, date, startTime: start, durationMin: duration }]),
+      { label: '세션 등록', onRetry }
     );
     $('#modal-quick-add').close();
     flash('등록되었습니다.');
