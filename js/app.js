@@ -1,6 +1,6 @@
 import { Store } from './store.js';
 import { parseCSV, parseXLSX, parseFreeText } from './parser.js';
-import { renderWeek, renderMonth, computeEndTime, HOUR_HEIGHT, startOfWeek, addDays } from './calendar.js';
+import { renderWeek, renderMonth, computeEndTime, HOUR_HEIGHT, CALENDAR_H_START, startOfWeek, addDays } from './calendar.js';
 import { exportSchedule, exportScheduleBlob } from './exporter.js';
 import { buildICS } from './ics.js';
 import { sbReady, status as sbStatus } from './supabase.js';
@@ -775,9 +775,12 @@ $('#calendar').addEventListener('click', (ev) => {
   if (dayCol && dayCol.dataset.date) {
     const rect = dayCol.getBoundingClientRect();
     const y = ev.clientY - rect.top;
-    const totalMin = Math.max(0, Math.min(23 * 60 + 30, Math.floor(y / HOUR_HEIGHT * 60 / 30) * 30));
-    const h = Math.floor(totalMin / 60);
-    const mi = totalMin % 60;
+    // Map Y offset to absolute time, then wrap back from virtual 28h timeline to 0-23h
+    const offsetMin = Math.floor(y / HOUR_HEIGHT * 60 / 30) * 30;
+    const absMin = CALENDAR_H_START * 60 + offsetMin;
+    const realMin = absMin >= 24 * 60 ? absMin - 24 * 60 : absMin;
+    const h = Math.floor(realMin / 60) % 24;
+    const mi = realMin % 60;
     const time = String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
     openQuickAdd({ date: dayCol.dataset.date, time });
     return;
