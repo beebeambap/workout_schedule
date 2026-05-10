@@ -471,15 +471,8 @@ function renderMembers() {
       ${status}
       <span class="mr-count">${counts[m.id] || 0}건</span>
       ${memo}
-      <button class="mr-edit" data-id="${m.id}" title="정보 편집" aria-label="정보 편집">✎</button>
     </li>`;
   }).join('');
-  ul.querySelectorAll('.mr-edit').forEach(b => {
-    b.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      openMemberModal(b.dataset.id);
-    });
-  });
   ul.querySelectorAll('li.member-row').forEach(li => {
     li.addEventListener('click', () => openMemberDetail(li.dataset.id));
   });
