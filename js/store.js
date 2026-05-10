@@ -19,6 +19,7 @@ function rowToMember(r) {
     memo: r.memo || '',
     status: r.status || 'active',
     statusAt: r.status_at || null,
+    totalSessions: r.total_sessions ?? null,
   };
 }
 
@@ -81,7 +82,7 @@ export const Store = {
   },
 
   // ---- writes ----
-  async ensureMember(name, color, memo) {
+  async ensureMember(name, color, memo, totalSessions) {
     const trimmed = String(name || '').trim();
     if (!trimmed) throw new Error('회원명이 비어 있습니다.');
     const existing = cache.members.find(m => m.name === trimmed);
@@ -89,14 +90,17 @@ export const Store = {
       const patch = {};
       if (color && color !== existing.color) patch.color = color;
       if (memo && !existing.memo) patch.memo = memo;
+      if (totalSessions != null) patch.totalSessions = totalSessions;
       if (Object.keys(patch).length) await this.updateMember(existing.id, patch);
       return existing;
     }
-    const { data, error } = await sb.from('members').insert({
+    const row = {
       name: trimmed,
       color: color || pickNextColor(cache.members),
       memo: memo || '',
-    }).select().single();
+    };
+    if (totalSessions != null) row.total_sessions = totalSessions;
+    const { data, error } = await sb.from('members').insert(row).select().single();
     if (error) throw error;
     const m = rowToMember(data);
     upsertCache(cache.members, m);
@@ -125,6 +129,9 @@ export const Store = {
         const today = new Date();
         update.status_at = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
       }
+    }
+    if ('totalSessions' in patch) {
+      update.total_sessions = patch.totalSessions === '' || patch.totalSessions == null ? null : Number(patch.totalSessions);
     }
     const { data, error } = await sb.from('members').update(update).eq('id', id).select().single();
     if (error) throw error;

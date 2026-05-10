@@ -521,8 +521,10 @@ $('#form-member').addEventListener('submit', async (e) => {
   const fd = new FormData(e.target);
   const name = String(fd.get('name')).trim();
   if (!name) return;
+  const tsRaw = fd.get('total_sessions');
+  const totalSessions = tsRaw && tsRaw !== '' ? Number(tsRaw) : null;
   try {
-    await Store.ensureMember(name, fd.get('color'), String(fd.get('memo') || '').trim());
+    await Store.ensureMember(name, fd.get('color'), String(fd.get('memo') || '').trim(), totalSessions);
     $('#modal-add-member').close();
     flash(`${name}님이 추가되었습니다.`);
   } catch (err) {
@@ -571,6 +573,7 @@ function renderMembers() {
 
   const counts = Store.countByMember();
   const todayStr = ymd(new Date());
+  const in14 = ymd(addDays(new Date(), 14));
 
   // 회원별 다음 예정 수업 계산
   const nextMap = {};
@@ -578,6 +581,27 @@ function renderMembers() {
     .filter(s => s.memberId && s.date >= todayStr && (s.status || 'scheduled') === 'scheduled')
     .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
     .forEach(s => { if (!nextMap[s.memberId]) nextMap[s.memberId] = s; });
+
+  // 회원별 잔여 수업 + 장기 미방문 계산
+  const alertMap = {};
+  for (const m of Store.members()) {
+    const mSessions = Store.sessions().filter(s => s.memberId === m.id);
+    // 잔여 수업: 완료 + 노쇼(차감)가 used 로 집계
+    let remaining = null;
+    if (m.totalSessions != null) {
+      const used = mSessions.filter(s => ['completed', 'noshow_charged'].includes(s.status)).length;
+      remaining = m.totalSessions - used;
+    }
+    // 장기 미방문: 활성 회원 중 다음 2주 예정 없고, 마지막 수업이 14일 이상 지남
+    let isAbsent = false;
+    if ((m.status || 'active') === 'active') {
+      const hasUpcoming = mSessions.some(s => s.date >= todayStr && s.date <= in14 && (s.status || 'scheduled') === 'scheduled');
+      const lastDate = mSessions.filter(s => s.date <= todayStr).map(s => s.date).sort().at(-1);
+      const daysSince = lastDate ? Math.round((new Date(todayStr) - new Date(lastDate)) / 86400000) : null;
+      isAbsent = !hasUpcoming && (daysSince === null || daysSince >= 14) && mSessions.length > 0;
+    }
+    alertMap[m.id] = { remaining, isAbsent };
+  }
 
   // 정렬
   if (memberFilters.sort === 'count') {
@@ -589,6 +613,15 @@ function renderMembers() {
       if (!na) return 1;
       if (!nb) return -1;
       return (na.date + na.startTime).localeCompare(nb.date + nb.startTime);
+    });
+  } else if (memberFilters.sort === 'remaining') {
+    ms = [...ms].sort((a, b) => {
+      const ra = alertMap[a.id]?.remaining, rb = alertMap[b.id]?.remaining;
+      // 잔여 설정된 회원 우선, 잔여 적은 순, null은 뒤로
+      if (ra == null && rb == null) return 0;
+      if (ra == null) return 1;
+      if (rb == null) return -1;
+      return ra - rb;
     });
   }
   // 'name'은 store 기본 가나다 순 유지
@@ -606,6 +639,15 @@ function renderMembers() {
     } else {
       nextHtml = `<span class="mr-next mr-next-none">예정 없음</span>`;
     }
+    const { remaining, isAbsent } = alertMap[m.id] || {};
+    let alertHtml = '';
+    if (remaining != null) {
+      const cls = remaining <= 1 ? 'sessions-danger' : remaining <= 3 ? 'sessions-warn' : 'sessions-ok';
+      alertHtml += `<span class="mr-remaining ${cls}">잔여 ${remaining}회</span>`;
+    }
+    if (isAbsent) {
+      alertHtml += `<span class="mr-absent">장기 미방문</span>`;
+    }
     return `<li class="member-row" data-id="${esc(m.id)}" style="--accent:${m.color}">
       <span class="mr-color" style="background:${m.color}"></span>
       <div class="mr-body">
@@ -617,6 +659,7 @@ function renderMembers() {
           ${nextHtml}
           <span class="mr-count">${counts[m.id] || 0}건</span>
         </div>
+        ${alertHtml ? `<div class="mr-line3">${alertHtml}</div>` : ''}
       </div>
     </li>`;
   }).join('');
@@ -1059,6 +1102,7 @@ function openMemberModal(memberId) {
   $('#mm-color').value = m.color;
   initColorPicker($('#mm-color'), $('#mm-color-palette'));
   $('#mm-memo').value = m.memo || '';
+  $('#mm-total-sessions').value = m.totalSessions ?? '';
   const statusSel = $('#mm-status');
   if (statusSel) statusSel.value = m.status || 'active';
   const cnt = Store.countByMember()[m.id] || 0;
@@ -1069,11 +1113,13 @@ function openMemberModal(memberId) {
 
   $('#mm-save').onclick = async () => {
     try {
+      const tsRaw = $('#mm-total-sessions').value;
       await Store.updateMember(m.id, {
         name: $('#mm-name').value,
         color: $('#mm-color').value,
         memo: $('#mm-memo').value,
         status: $('#mm-status')?.value || 'active',
+        totalSessions: tsRaw === '' ? null : Number(tsRaw),
       });
       $('#modal-member').close();
       flash('저장되었습니다.');
@@ -1145,7 +1191,37 @@ function renderMemberDetail() {
   $('#md-title').textContent = `${m.name}님 스케줄`;
   $('#md-color').style.background = m.color;
   $('#md-name').textContent = m.name;
+
+  // 전체 수업 통계
+  const completedCnt = allSessions.filter(s => s.status === 'completed').length;
+  const noshowChargedCnt = allSessions.filter(s => s.status === 'noshow_charged').length;
+  const noshowFreeCnt = allSessions.filter(s => s.status === 'noshow_free').length;
+  const canceledCnt = allSessions.filter(s => s.status === 'canceled').length;
+  const usedCnt = completedCnt + noshowChargedCnt;
+  const remaining = m.totalSessions != null ? m.totalSessions - usedCnt : null;
+  const remCls = remaining != null ? (remaining <= 1 ? 'stat-danger' : remaining <= 3 ? 'stat-warn' : 'stat-ok') : '';
+
   $('#md-stats').textContent = `등록된 수업 ${allSessions.length}건`;
+
+  const statsEl = $('#md-session-stats');
+  if (statsEl) {
+    const cells = [
+      m.totalSessions != null
+        ? `<div class="stat-cell"><span class="stat-num">${m.totalSessions}</span><span class="stat-label">총 구매</span></div>`
+        : '',
+      remaining != null
+        ? `<div class="stat-cell ${remCls}"><span class="stat-num">${remaining}</span><span class="stat-label">잔여</span></div>`
+        : '',
+      `<div class="stat-cell"><span class="stat-num">${completedCnt}</span><span class="stat-label">완료</span></div>`,
+      noshowChargedCnt + noshowFreeCnt > 0
+        ? `<div class="stat-cell stat-noshow"><span class="stat-num">${noshowChargedCnt + noshowFreeCnt}</span><span class="stat-label">노쇼</span></div>`
+        : '',
+      canceledCnt > 0
+        ? `<div class="stat-cell"><span class="stat-num">${canceledCnt}</span><span class="stat-label">취소</span></div>`
+        : '',
+    ].filter(Boolean).join('');
+    statsEl.innerHTML = cells ? `<div class="md-stats-grid">${cells}</div>` : '';
+  }
   const memoEl = $('#md-memo');
   if (m.memo) {
     memoEl.textContent = m.memo;

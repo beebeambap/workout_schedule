@@ -202,6 +202,7 @@
         <button class="sort-btn active" data-sort="name">이름순</button>
         <button class="sort-btn" data-sort="count">수업 많은 순</button>
         <button class="sort-btn" data-sort="next">다음 수업 순</button>
+        <button class="sort-btn" data-sort="remaining">잔여 적은 순</button>
       </div>
       <button id="btn-add-member" class="primary">+ 새 회원</button>
     </div>
@@ -230,6 +231,7 @@
     <div class="modal-body">
       <form id="form-member">
         <label>회원명<input name="name" required autocomplete="off"></label>
+        <label>총 구매 수업 수<input name="total_sessions" type="number" min="1" max="999" placeholder="미입력 시 잔여 미표시"></label>
         <label>메모(선택)<input name="memo" placeholder="특이사항, 부상 이력 등"></label>
         <div class="form-color-row">
           <div class="color-picker-wrap">
@@ -288,6 +290,7 @@
           <input type="hidden" id="mm-color" value="#0b837d">
         </div>
       </div>
+      <label>총 구매 수업 수<input id="mm-total-sessions" type="number" min="1" max="999" placeholder="미입력 시 잔여 미표시"></label>
       <label>메모<textarea id="mm-memo" rows="5" placeholder="특이사항, 부상, 컨디션, 목표 등"></textarea></label>
       <p id="mm-stats" class="hint"></p>
     </div>
@@ -323,6 +326,7 @@
           <h4 id="md-name"></h4>
         </div>
         <p id="md-stats" class="hint"></p>
+        <div id="md-session-stats" class="md-session-stats"></div>
         <div class="md-section">
           <h5>메모</h5>
           <p id="md-memo"></p>
