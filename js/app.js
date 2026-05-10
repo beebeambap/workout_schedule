@@ -359,24 +359,28 @@ function positionShadePopup(popup, chipEl) {
   popup.style.visibility = '';
 }
 
-// 컬러 피커: 10휴 칩(5×2 그리드) + 칩 클릭 시 명도 풍선모달
+// 컬러 피커: 10휴 칩 1줄 + 선택 색 스와치 + 클릭 시 명도 풍선모달
 function initColorPicker(inputEl, paletteEl) {
   paletteEl.classList.add('color-picker');
   paletteEl.innerHTML = `
-    <div class="color-hue-row" role="radiogroup" aria-label="컬러 선택">
-      ${COLOR_HUES.map(hd => `
-        <button type="button"
-                class="color-hue${hd.isCore ? ' is-core' : ''}"
-                data-hi="${hd.hueIndex}"
-                style="background:${hd.baseHex}"
-                title="${esc(hd.name)}${hd.isCore ? ' · 레슨핏 시그니처' : ''}"
-                aria-label="${esc(hd.name)}"
-                aria-expanded="false"></button>
-      `).join('')}
+    <div class="color-picker-bar">
+      <div class="color-hue-row" role="radiogroup" aria-label="컬러 선택">
+        ${COLOR_HUES.map(hd => `
+          <button type="button"
+                  class="color-hue${hd.isCore ? ' is-core' : ''}"
+                  data-hi="${hd.hueIndex}"
+                  style="background:${hd.baseHex}"
+                  title="${esc(hd.name)}${hd.isCore ? ' · 레슨핏 시그니처' : ''}"
+                  aria-label="${esc(hd.name)}"
+                  aria-expanded="false"></button>
+        `).join('')}
+      </div>
+      <span class="color-current-swatch" title="현재 선택 색상"></span>
     </div>
   `;
 
   const hueRow = paletteEl.querySelector('.color-hue-row');
+  const swatch = paletteEl.querySelector('.color-current-swatch');
   let openHueIndex = null;
 
   function openPopup(hi, chipEl) {
@@ -459,6 +463,7 @@ function initColorPicker(inputEl, paletteEl) {
     hueRow.querySelectorAll('.color-hue').forEach((b, i) => {
       b.classList.toggle('active', i === matchedHue);
     });
+    if (swatch) swatch.style.background = inputEl.value || COLOR_DEFAULT;
     if (_shadePopup && !_shadePopup.hidden) {
       _shadePopup.querySelectorAll('.color-shade').forEach(b => {
         b.classList.toggle('selected', b.dataset.color.toLowerCase() === v);
@@ -569,6 +574,14 @@ $('#member-filter').addEventListener('change', (e) => {
   state.filter = e.target.value;
   renderCalendar();
 });
+
+// 내보내기 드롭다운 토글
+const _exportMenuList = $('#export-menu-list');
+$('#btn-export-menu').addEventListener('click', (e) => {
+  e.stopPropagation();
+  _exportMenuList.hidden = !_exportMenuList.hidden;
+});
+document.addEventListener('click', () => { if (_exportMenuList) _exportMenuList.hidden = true; });
 
 $('#btn-export').addEventListener('click', async () => {
   const member = state.filter ? Store.members().find(m => m.id === state.filter) : null;
@@ -798,6 +811,10 @@ $('#qa-save').addEventListener('click', async () => {
       { label: '세션 등록', onRetry }
     );
     $('#modal-quick-add').close();
+    // 추가된 날짜가 현재 뷰 범위 밖이면 해당 날짜로 이동 후 명시적 재렌더
+    const addedDate = new Date(date + 'T00:00:00');
+    if (!isNaN(addedDate.getTime())) state.anchor = addedDate;
+    renderCalendar();
     flash('등록되었습니다.');
   } catch (err) {
     console.error('[quick-add] error:', err);

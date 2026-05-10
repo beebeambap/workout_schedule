@@ -5,7 +5,7 @@
 //    refresh shows the new version)
 // - Cross-origin (Supabase, CDN, GitHub API): bypass entirely
 
-const CACHE = 'pt-cache-v17';
+const CACHE = 'pt-cache-v18';
 const ASSETS = [
   './',
   './index.html',
