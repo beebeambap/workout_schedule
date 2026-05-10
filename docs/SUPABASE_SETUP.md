@@ -155,12 +155,15 @@ alter table public.members
   add column if not exists status text not null default 'active',
   add column if not exists status_at date not null default current_date;
 
--- sessions: 수업 상태 (예정/완료/취소)
+-- sessions: 수업 상태
+-- 허용 값: scheduled | completed | canceled | noshow_charged | noshow_free
 alter table public.sessions
   add column if not exists status text not null default 'scheduled';
 ```
 
-이 SQL을 실행하지 않아도 기본 캘린더/회원 관리 기능은 그대로 동작합니다. "내 일정 추가", 통계의 PT 연장/종료, 수업 상태(완료/취소) 항목은 마이그레이션 후 활성화됩니다.
+이 SQL을 실행하지 않아도 기본 캘린더/회원 관리 기능은 그대로 동작합니다. "내 일정 추가", 통계의 PT 연장/종료, 수업 상태(완료/취소/노쇼) 항목은 마이그레이션 후 활성화됩니다.
+
+> **노쇼 상태**: `noshow_charged`(회차 차감) / `noshow_free`(차감 면제) 두 가지로 분리됩니다. 정산·잔여 횟수 계산에서 다르게 처리하기 위함입니다. DB 컬럼은 `text`이므로 추가 마이그레이션 없이 바로 사용 가능합니다.
 
 ## 6.7 매직 링크 이메일 커스터마이즈 (레슨핏 브랜딩)
 

@@ -70,7 +70,7 @@
         <span id="period-label"></span>
         <button id="btn-next" title="다음">→</button>
         <button id="btn-today">오늘</button>
-        <button id="btn-quick-add" title="스케줄 빠른 추가" class="primary">+ 스케줄</button>
+        <button id="btn-quick-add" title="스케줄 빠른 추가" class="primary btn-mobile-cta">+ 스케줄</button>
       </div>
       <div class="toolbar-right">
         <select id="view-mode" title="뷰">
@@ -190,8 +190,14 @@
     <h3 id="ms-title">수업</h3>
     <div id="ms-body" class="modal-body"></div>
     <div id="ms-status-section" class="ms-status-section">
-      <span class="ms-status-label">상태</span>
-      <div id="ms-status-controls" class="ms-status-controls"></div>
+      <div class="ms-status-row">
+        <span class="ms-status-label">상태</span>
+        <div id="ms-status-controls" class="ms-status-controls"></div>
+      </div>
+      <div id="ms-status-sub" class="ms-status-sub" hidden>
+        <span class="ms-status-label">회차 차감</span>
+        <div id="ms-status-sub-controls" class="ms-status-controls"></div>
+      </div>
     </div>
     <div class="modal-actions">
       <button type="button" id="ms-edit-member">회원 편집</button>

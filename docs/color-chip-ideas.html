@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>회원 컬러칩 고도화 탐색</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --primary:#2563eb; --primary-soft:#eff6ff;
+    --slate:#111827; --bg:#f6f7f9; --surface:#fff;
+    --surface-soft:#f9fafb;
+    --border:#e5e7eb; --border-strong:#d1d5db;
+    --text:#111827; --text-muted:#6b7280; --text-faint:#9ca3af;
+    --danger:#dc2626; --danger-bg:#fee2e2;
+    --info-bg:#dbeafe; --info-text:#1d4ed8;
+    --success:#16a34a; --success-bg:#dcfce7;
+    --warn:#f59e0b; --warn-bg:#fef3c7;
+    --radius:8px; --radius-lg:12px;
+    --shadow-sm:0 1px 2px rgba(0,0,0,.05);
+    --shadow-md:0 4px 14px rgba(0,0,0,.10);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:'Noto Sans KR',system-ui,sans-serif;font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:.86em;color:var(--text-muted)}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 24px 120px}
+  @media (max-width:640px){ .wrap{padding:20px 16px 80px} }
+
+  .hero{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:28px 32px;margin-bottom:28px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-60px;top:-60px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,var(--primary-soft),transparent 70%);pointer-events:none}
+  .eyebrow{font-size:11px;font-weight:600;color:var(--primary);letter-spacing:1.2px;text-transform:uppercase}
+  h1{margin:6px 0 8px;font-size:26px;letter-spacing:-.5px;line-height:1.25}
+  .hero p{margin:0;color:var(--text-muted);max-width:62ch}
+
+  section{margin-bottom:32px}
+  section > h2{display:flex;align-items:center;gap:10px;font-size:18px;letter-spacing:-.3px;margin:0 0 4px}
+  section > h2 .num{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:6px;background:var(--slate);color:#fff;font-size:11px;font-weight:700}
+  section > .lede{margin:0 0 14px;color:var(--text-muted);font-size:14px}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow-sm)}
+  .card + .card{margin-top:14px}
+  .card h3{margin:0 0 6px;font-size:15px;font-weight:700;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .card p.body{margin:0 0 10px;font-size:14px;color:var(--text-muted)}
+  .card ul{margin:8px 0 0;padding-left:18px;font-size:13.5px}
+  .card li{margin:4px 0}
+
+  .demo{background:var(--surface-soft);border:1px solid var(--border);border-radius:var(--radius);padding:20px;position:relative;margin-top:12px}
+  .demo-label{position:absolute;top:8px;right:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);letter-spacing:.3px}
+
+  .tag{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;padding:3px 8px;border-radius:999px;line-height:1.3}
+  .tag.rec{background:var(--success-bg);color:#166534}
+  .tag.alt{background:var(--info-bg);color:var(--info-text)}
+  .tag.new{background:#f3e8ff;color:#6b21a8}
+  .tag::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.7}
+
+  .note{margin-top:12px;padding:10px 12px;background:var(--surface-soft);border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:6px;font-size:13px;color:var(--text-muted)}
+  .note b{color:var(--text)}
+
+  /* ===== Concept 1 — hue → shade expansion ===== */
+  .c1-stage{display:flex;flex-wrap:wrap;gap:10px;align-items:center;min-height:60px}
+  .c1-hue{
+    width:38px;height:38px;border-radius:50%;cursor:pointer;flex-shrink:0;
+    transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s;
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.08);position:relative;
+  }
+  .c1-hue:hover{transform:scale(1.08)}
+  .c1-hue.is-open{transform:scale(1.18);box-shadow:inset 0 0 0 1px rgba(0,0,0,.08),0 0 0 3px var(--surface),0 0 0 5px currentColor}
+  .c1-hue .used-pip{position:absolute;bottom:-2px;right:-2px;background:#fff;color:var(--text);font-size:9px;font-weight:700;padding:1px 4px;border-radius:999px;border:1px solid var(--border);line-height:1}
+  .c1-shades{
+    display:inline-flex;background:var(--surface);border:1px solid var(--border);border-radius:999px;
+    padding:5px;gap:5px;align-items:center;box-shadow:var(--shadow-md);
+    animation:popOpen .28s cubic-bezier(.2,.8,.2,1);transform-origin:left center;
+  }
+  @keyframes popOpen{from{opacity:0;transform:scaleX(.4)}to{opacity:1;transform:scaleX(1)}}
+  .c1-shade{width:28px;height:28px;border-radius:50%;cursor:pointer;position:relative;transition:transform .15s;flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+  .c1-shade:hover{transform:scale(1.15)}
+  .c1-shade.is-selected{box-shadow:inset 0 0 0 2px #fff,0 0 0 2px currentColor}
+  .c1-shade.is-used::after{content:"";position:absolute;inset:0;border-radius:50%;background-image:repeating-linear-gradient(45deg,transparent 0 3px,rgba(255,255,255,.55) 3px 5px)}
+  .c1-shade .used-dot{position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;background:var(--surface);box-shadow:0 0 0 1.5px var(--text)}
+  .c1-meta{font-size:12px;color:var(--text-muted);margin-top:10px;font-family:'JetBrains Mono',monospace}
+
+  /* ===== Concept 2 — color + texture ===== */
+  .c2{display:grid;grid-template-columns:auto repeat(5,1fr);gap:10px;align-items:center;max-width:520px}
+  .c2 .h{font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.6px;font-weight:700;text-align:center}
+  .c2 .l{font-size:11px;color:var(--text-muted);font-weight:600;padding-right:4px;text-align:right}
+  .c2-cell{aspect-ratio:1;border-radius:9px;max-width:42px;cursor:pointer;position:relative;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+  .p-solid{}
+  .p-dot{background-image:radial-gradient(rgba(255,255,255,.55) 1.8px,transparent 2px);background-size:7px 7px}
+  .p-stripe{background-image:repeating-linear-gradient(45deg,transparent 0 3.5px,rgba(255,255,255,.5) 3.5px 6px)}
+  .p-ring::after{content:"";position:absolute;inset:5px;border-radius:50%;border:2.5px solid rgba(255,255,255,.6)}
+  .p-grid{background-image:linear-gradient(rgba(255,255,255,.4) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.4) 1px,transparent 1px);background-size:7px 7px}
+
+  /* ===== Concept 3 — monogram pairing ===== */
+  .c3-list{list-style:none;margin:0;padding:0;border:1px solid var(--border);border-radius:10px;background:var(--surface);overflow:hidden}
+  .c3-list li{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);font-size:13px;border-left:3px solid var(--accent,#0284c7)}
+  .c3-list li:last-child{border-bottom:none}
+  .c3-mono{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:11px;letter-spacing:-.3px;flex-shrink:0;background:var(--accent)}
+  .c3-list .nm{font-weight:600}
+  .c3-list .meta{margin-left:auto;font-size:11px;color:var(--text-muted)}
+
+  /* ===== Concept 4 — calendar event ===== */
+  .ev-row{display:flex;gap:8px;flex-wrap:wrap}
+  .ev{padding:6px 10px;border-radius:6px;color:#fff;font-size:11.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;box-shadow:var(--shadow-sm)}
+  .ev .ini{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:rgba(255,255,255,.25);font-size:9px;font-weight:800;letter-spacing:-.2px}
+
+  /* ===== domain selector ===== */
+  .domain-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:6px}
+  .domain{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;position:relative;cursor:pointer;transition:border-color .2s,box-shadow .2s}
+  .domain:hover{border-color:var(--primary);box-shadow:var(--shadow-sm)}
+  .domain .icon{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;font-size:16px;margin-bottom:8px}
+  .domain h4{margin:0 0 2px;font-size:13.5px;font-weight:700}
+  .domain p{margin:0;font-size:11.5px;color:var(--text-muted);line-height:1.45}
+  .domain .palette-mini{display:flex;gap:3px;margin-top:8px}
+  .domain .palette-mini i{width:14px;height:14px;border-radius:50%}
+
+  /* ===== before/after table ===== */
+  table.cmp{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  table.cmp th,table.cmp td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--border);vertical-align:top}
+  table.cmp th{font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.6px;font-weight:700;background:var(--surface-soft)}
+  table.cmp td.k{font-weight:600;width:160px}
+  table.cmp .num{font-variant-numeric:tabular-nums;color:var(--text-muted)}
+
+  /* ===== capacity bar ===== */
+  .cap{display:flex;height:10px;background:#f1f5f9;border-radius:999px;overflow:hidden;margin-top:6px}
+  .cap i{display:block;height:100%}
+  .cap-legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;font-size:11px;color:var(--text-muted)}
+  .cap-legend span{display:inline-flex;align-items:center;gap:5px}
+  .cap-legend i{width:10px;height:10px;border-radius:3px}
+
+  details.tk{margin-top:12px;border:1px solid var(--border);border-radius:8px;background:var(--surface-soft)}
+  details.tk summary{cursor:pointer;padding:10px 12px;font-weight:600;font-size:13px;list-style:none}
+  details.tk summary::-webkit-details-marker{display:none}
+  details.tk summary::after{content:"▾";float:right;color:var(--text-muted)}
+  details.tk[open] summary::after{content:"▴"}
+  details.tk pre{margin:0;padding:0 12px 12px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.7;color:var(--text);overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="eyebrow">Color chip · advanced exploration</div>
+    <h1>회원 컬러칩 고도화 — 30+ 회원 + 다코치 시스템 대비</h1>
+    <p>현재 10색 팔레트는 회원이 11명을 넘는 순간 색 충돌이 시작됩니다. 또한 시스템이 PT를 넘어 필라테스·요가·골프·테니스 등 여러 코칭 도메인으로 확장된다면, 색 자체의 의미와 톤도 도메인별로 달라져야 합니다. 4가지 컨셉을 비교하고, 추천안 + 도메인별 프리셋 + 토큰 명세까지 정리했습니다.</p>
+  </div>
+
+  <!-- 0. PROBLEM -->
+  <section>
+    <h2><span class="num">0</span>해결하려는 문제</h2>
+    <p class="lede">10색 팔레트의 한계와, 다코치 확장 시 추가로 생기는 요구사항.</p>
+
+    <div class="card">
+      <h3>현재의 마찰점</h3>
+      <ul>
+        <li><b>11번째 회원부터 색이 무조건 중복</b> — 트레이너 1명이 보통 20-40명을 관리하므로 같은 색 회원이 2-4명씩 겹칩니다.</li>
+        <li><b>해시 배정의 클러스터링</b> — 신규 5명을 등록하면 같은 색이 2-3명에 몰리는 일이 잦습니다.</li>
+        <li><b>색만으로는 식별 불가</b> — 캘린더 좁은 칸에 "민수/민지/민영"이 동시에 있으면 색 톤만으로 누가 누군지 모릅니다.</li>
+        <li><b>도메인 톤이 단일</b> — 골프 코치가 PT용 채도 높은 팔레트를 쓰면 자연스럽지 않을 수 있습니다.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 1. CONCEPT 1 — hue→shade -->
+  <section>
+    <h2><span class="num">1</span>컨셉 A. 휴(Hue) → 명도(Shade) 2단 선택 <span class="tag rec" style="margin-left:auto">추천</span></h2>
+    <p class="lede">사용자가 제안한 방향. 색 클릭 → 명도 트레이가 펼쳐지고 → 명도 선택. <b>10 휴 × 4 명도 = 40색</b>까지 충돌 없이 확장됩니다.</p>
+
+    <div class="card">
+      <h3>인터랙션 — 휴를 클릭하면 명도가 펼쳐집니다</h3>
+      <p class="body">실제로 클릭해 보세요. 회색 점선 마커가 있는 칩은 <b>이미 사용 중</b>인 색입니다 (자동 회피).</p>
+
+      <div class="demo">
+        <div class="demo-label">CLICK A HUE → EXPANDS</div>
+        <div class="c1-stage" id="c1Stage"></div>
+        <div class="c1-meta" id="c1Meta">선택된 색 없음</div>
+      </div>
+
+      <ul>
+        <li><b>1단계 (휴)</b>: 기존 10색 그대로 — 학습 비용 0. 우상단에 "사용 중 N명" 작은 카운트 배지.</li>
+        <li><b>2단계 (명도)</b>: 4단계 (어두움 / 기본 / 밝음 / 더 밝음). 이미 쓰인 명도는 <b>해칭 + ●</b>로 표시.</li>
+        <li><b>애니메이션</b>: 휴는 1.18배 확대 + 외곽 링 / 명도 트레이는 좌→우 0.28s 펼침.</li>
+        <li><b>키보드</b>: 휴 포커스 후 <span class="mono">Enter</span> 펼침, <span class="mono">←→</span> 명도 이동, <span class="mono">Esc</span> 닫기.</li>
+      </ul>
+
+      <div class="note"><b>왜 추천?</b> ① 학습 비용이 가장 낮음(기존 멘탈 모델 유지) ② 색 정체성 유지(같은 휴=같은 회원군 느낌) ③ 명도는 다크모드/캘린더 배경과의 대비도 같이 조절할 수 있는 부가 효과.</div>
+    </div>
+
+    <div class="card">
+      <h3>스마트 자동 배정 — 라운드로빈 + 휴 우선 + 명도 후순위</h3>
+      <p class="body">신규 회원에게 색을 자동 배정할 때, 가장 적게 쓰인 휴 → 그 안에서 가장 적게 쓰인 명도 순으로 결정. 결정적이라 마이그레이션 안전.</p>
+      <details class="tk">
+        <summary>의사 코드 보기</summary>
+<pre>function autoAssign(members, palette) {
+  // palette: [{hue:'sky', shades:['#0c4a6e','#0284c7','#38bdf8','#bae6fd']}, ...]
+  const used = countByHueShade(members);
+
+  // 1. 가장 적게 쓰인 휴 후보들
+  const minHueCount = Math.min(...palette.map(h => used.hue[h.id] ?? 0));
+  const hueCandidates = palette.filter(h => (used.hue[h.id] ?? 0) === minHueCount);
+
+  // 2. 이름 해시로 결정적 휴 선택 (tie-break)
+  const hue = hueCandidates[hash(name) % hueCandidates.length];
+
+  // 3. 그 휴 안에서 가장 적게 쓰인 명도
+  const shadeCounts = hue.shades.map(s => used.shade[s] ?? 0);
+  const minShade = Math.min(...shadeCounts);
+  const shadeIdx = shadeCounts.findIndex(c => c === minShade);
+
+  return hue.shades[shadeIdx];
+}</pre>
+      </details>
+    </div>
+  </section>
+
+  <!-- 2. CONCEPT 2 — pattern -->
+  <section>
+    <h2><span class="num">2</span>컨셉 B. 색 + 패턴 (텍스처) <span class="tag alt" style="margin-left:auto">대안</span></h2>
+    <p class="lede">10휴 × 5패턴 = <b>50조합</b>. 색약·흑백 인쇄에서도 식별 가능. 단점은 캘린더 작은 블록에서 패턴이 잘 안 보일 수 있음.</p>
+
+    <div class="card">
+      <h3>10 × 5 그리드 — 같은 색 내에서 패턴으로 분기</h3>
+      <div class="demo">
+        <div class="demo-label">HUE × PATTERN</div>
+        <div class="c2">
+          <div></div>
+          <div class="h">solid</div><div class="h">dot</div><div class="h">stripe</div><div class="h">ring</div><div class="h">grid</div>
+        </div>
+        <div class="c2" id="c2Grid" style="margin-top:6px"></div>
+      </div>
+      <div class="note"><b>장점:</b> 색약 친화 / 흑백 인쇄 대비. <b>단점:</b> 캘린더 16×40px 블록에서 패턴 식별 어려움 → 컨셉 A에 비해 고밀도 화면에서 약함.</div>
+    </div>
+  </section>
+
+  <!-- 3. CONCEPT 3 — color + monogram -->
+  <section>
+    <h2><span class="num">3</span>컨셉 C. 색 + 이니셜 모노그램 <span class="tag rec" style="margin-left:auto">병행 권장</span></h2>
+    <p class="lede">컨셉 A와 <b>같이 쓰는 것을 추천</b>. 색은 그룹핑 단서, 이니셜은 절대 식별자. 10명 이상에서도 누가 누군지 즉시 보입니다.</p>
+
+    <div class="card">
+      <h3>회원 리스트 — 색 + 모노그램 동시 표시</h3>
+      <div class="demo">
+        <div class="demo-label">COLOR + MONOGRAM</div>
+        <ul class="c3-list" style="max-width:380px">
+          <li style="--accent:#0284c7"><span class="c3-mono">민수</span><span class="nm">김민수</span><span class="meta">잔여 8</span></li>
+          <li style="--accent:#38bdf8"><span class="c3-mono">민지</span><span class="nm">김민지</span><span class="meta">잔여 12</span></li>
+          <li style="--accent:#0c4a6e"><span class="c3-mono">민영</span><span class="nm">김민영</span><span class="meta">잔여 3</span></li>
+          <li style="--accent:#15803d"><span class="c3-mono">지영</span><span class="nm">박지영</span><span class="meta">잔여 5</span></li>
+          <li style="--accent:#7c3aed"><span class="c3-mono">하늘</span><span class="nm">이하늘</span><span class="meta">잔여 11</span></li>
+        </ul>
+      </div>
+
+      <h3 style="margin-top:14px">캘린더 이벤트 — 좁은 블록에서도 식별</h3>
+      <div class="demo">
+        <div class="demo-label">CALENDAR EVENT</div>
+        <div class="ev-row">
+          <div class="ev" style="background:#0284c7"><span class="ini">민수</span> 17:00</div>
+          <div class="ev" style="background:#38bdf8"><span class="ini">민지</span> 17:30</div>
+          <div class="ev" style="background:#0c4a6e"><span class="ini">민영</span> 18:00</div>
+          <div class="ev" style="background:#15803d"><span class="ini">지영</span> 18:30</div>
+          <div class="ev" style="background:#7c3aed"><span class="ini">하늘</span> 19:00</div>
+        </div>
+      </div>
+
+      <ul>
+        <li>모노그램 = 한글 이름 마지막 2글자 (성은 같은 회원이 많아 변별력 낮음).</li>
+        <li>영문/숫자 이름은 첫 1-2자.</li>
+        <li>흰 텍스트 위 어두운 명도, 검정 텍스트 위 밝은 명도 — <b>자동 대비 선택</b>으로 가독성 유지.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 4. CONCEPT 4 — capacity -->
+  <section>
+    <h2><span class="num">4</span>컨셉 D. 팔레트 사용량 시각화 <span class="tag new" style="margin-left:auto">보조</span></h2>
+    <p class="lede">트레이너에게 "팔레트가 얼마나 차 있는지" 한 줄로 보여 주는 보조 위젯. 회원 30명 넘어가는 시점부터 효용이 큼.</p>
+
+    <div class="card">
+      <h3>팔레트 캐퍼시티 바</h3>
+      <p class="body">10휴 × 4명도 = 40개 슬롯 중 사용 중인 비율. 색이 한쪽에 몰리면 시각적으로 즉시 보입니다.</p>
+      <div class="demo">
+        <div class="demo-label">PALETTE CAPACITY · 24/40</div>
+        <div class="cap" id="capBar"></div>
+        <div class="cap-legend">
+          <span><i style="background:#0284c7"></i>하늘 4</span>
+          <span><i style="background:#15803d"></i>숲 3</span>
+          <span><i style="background:#7c3aed"></i>라벤더 3</span>
+          <span><i style="background:#e11d48"></i>산호 3</span>
+          <span><i style="background:#a16207"></i>머스터드 3</span>
+          <span><i style="background:#0d9488"></i>민트 2</span>
+          <span><i style="background:#ea580c"></i>귤 2</span>
+          <span><i style="background:#4f46e5"></i>청보라 2</span>
+          <span><i style="background:#c026d3"></i>자두 1</span>
+          <span><i style="background:#475569"></i>그라파이트 1</span>
+          <span><i style="background:#f1f5f9;border:1px solid var(--border)"></i>여유 16</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. DOMAIN PRESETS -->
+  <section>
+    <h2><span class="num">5</span>다코치 시스템 — 도메인별 팔레트 프리셋</h2>
+    <p class="lede">시스템이 PT뿐 아니라 다양한 코칭으로 확장되는 것을 가정. 도메인별로 <b>분위기는 달라도 구조(10휴 × 4명도)는 동일</b>해야 컴포넌트 재사용성이 유지됩니다.</p>
+
+    <div class="card">
+      <h3>5-1. 도메인 프리셋 5종 제안</h3>
+      <p class="body">각 프리셋은 동일한 토큰 구조(<span class="mono">--hue-1</span> ~ <span class="mono">--hue-10</span>, 각 4명도)를 따르며, 워크스페이스 설정에서 한 번에 전환됩니다.</p>
+
+      <div class="domain-grid">
+        <div class="domain">
+          <div class="icon" style="background:#dbeafe;color:#1d4ed8">🏋️</div>
+          <h4>피트니스 / PT</h4>
+          <p>활기·강한 채도. 현재 팔레트 톤.</p>
+          <div class="palette-mini"><i style="background:#e11d48"></i><i style="background:#ea580c"></i><i style="background:#0284c7"></i><i style="background:#7c3aed"></i><i style="background:#15803d"></i></div>
+        </div>
+        <div class="domain">
+          <div class="icon" style="background:#fce7f3;color:#be185d">🧘</div>
+          <h4>요가 / 필라테스</h4>
+          <p>차분·파스텔. 채도 -20%, 명도 +10%.</p>
+          <div class="palette-mini"><i style="background:#fda4af"></i><i style="background:#fdba74"></i><i style="background:#7dd3fc"></i><i style="background:#c4b5fd"></i><i style="background:#86efac"></i></div>
+        </div>
+        <div class="domain">
+          <div class="icon" style="background:#dcfce7;color:#166534">⛳</div>
+          <h4>골프</h4>
+          <p>고급·차분. 어스톤 + 진한 그린.</p>
+          <div class="palette-mini"><i style="background:#7c2d12"></i><i style="background:#365314"></i><i style="background:#1e3a8a"></i><i style="background:#52525b"></i><i style="background:#854d0e"></i></div>
+        </div>
+        <div class="domain">
+          <div class="icon" style="background:#fef3c7;color:#854d0e">🎾</div>
+          <h4>테니스 / 스포츠</h4>
+          <p>경쾌·비비드. 코트 컬러 영감.</p>
+          <div class="palette-mini"><i style="background:#bef264"></i><i style="background:#fde047"></i><i style="background:#fb923c"></i><i style="background:#22d3ee"></i><i style="background:#f472b6"></i></div>
+        </div>
+        <div class="domain">
+          <div class="icon" style="background:#f3e8ff;color:#6b21a8">🎨</div>
+          <h4>학습 / 음악 / 미술</h4>
+          <p>다양·창의. 무지개 톤.</p>
+          <div class="palette-mini"><i style="background:#ef4444"></i><i style="background:#f59e0b"></i><i style="background:#10b981"></i><i style="background:#3b82f6"></i><i style="background:#a855f7"></i></div>
+        </div>
+        <div class="domain">
+          <div class="icon" style="background:#f1f5f9;color:#475569">⚙️</div>
+          <h4>커스텀</h4>
+          <p>전문 코치가 직접 10휴 정의.</p>
+          <div class="palette-mini"><i style="background:#cbd5e1"></i><i style="background:#cbd5e1"></i><i style="background:#cbd5e1"></i><i style="background:#cbd5e1"></i><i style="background:#cbd5e1"></i></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>5-2. 코치 도메인이 시스템 전반에 미치는 다른 영향</h3>
+      <p class="body">팔레트만 바꾸는 게 아니라, 도메인별로 자연스러운 용어·아이콘·기본 세션 길이도 달라집니다. 프리셋에 함께 묶어 두면 "코치 가입 → 도메인 선택 → 즉시 사용"이 됩니다.</p>
+      <table class="cmp">
+        <thead><tr><th>축</th><th>피트니스</th><th>요가/필라테스</th><th>골프</th><th>학습</th></tr></thead>
+        <tbody>
+          <tr><td class="k">호칭</td><td>회원</td><td>수강생</td><td>레슨생</td><td>학생</td></tr>
+          <tr><td class="k">세션 명</td><td>PT</td><td>클래스</td><td>레슨</td><td>수업</td></tr>
+          <tr><td class="k">기본 길이</td><td><span class="num">50분</span></td><td><span class="num">60분</span></td><td><span class="num">60-90분</span></td><td><span class="num">40-50분</span></td></tr>
+          <tr><td class="k">팔레트 톤</td><td>비비드</td><td>파스텔</td><td>어스</td><td>레인보우</td></tr>
+          <tr><td class="k">기본 폰트</td><td>Noto Sans KR</td><td>Noto Serif KR (소제목)</td><td>Noto Sans KR</td><td>Noto Sans KR</td></tr>
+        </tbody>
+      </table>
+      <div class="note"><b>구조 원칙:</b> 도메인은 <b>토큰 값만 다르고 토큰 키는 동일</b>해야 합니다. 컴포넌트 코드는 절대 도메인을 알지 못하게.</div>
+    </div>
+  </section>
+
+  <!-- 6. RECOMMENDATION -->
+  <section>
+    <h2><span class="num">6</span>최종 권장 — A + C 조합</h2>
+    <p class="lede">컨셉 A(휴→명도 2단)를 기본으로 두고, 컨셉 C(이니셜 모노그램)를 항상 함께 노출.</p>
+
+    <div class="card">
+      <h3>왜 이 조합인가</h3>
+      <table class="cmp">
+        <thead><tr><th>축</th><th>현재 (10색)</th><th>A 단독</th><th>A + C ★</th></tr></thead>
+        <tbody>
+          <tr><td class="k">고유 식별 가능 인원</td><td class="num">~10명</td><td class="num">~40명</td><td class="num"><b>사실상 무제한</b></td></tr>
+          <tr><td class="k">색약 친화</td><td>약함</td><td>중간(명도 차)</td><td><b>강함</b>(이니셜)</td></tr>
+          <tr><td class="k">학습 비용</td><td>—</td><td>낮음(클릭 1회 추가)</td><td>낮음</td></tr>
+          <tr><td class="k">캘린더 좁은 블록</td><td>색만</td><td>색만</td><td><b>색 + 이니셜</b></td></tr>
+          <tr><td class="k">기존 마이그레이션</td><td>—</td><td>10휴 = 기존 그대로<br>기본 명도로 매핑</td><td>동일</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>마이그레이션 — 기존 사용자에게 무중단 적용</h3>
+      <ul>
+        <li><b>v2 마이그레이션</b>: <span class="mono">lf_color_migration_v2</span> 플래그. 기존 hex → 가장 가까운 휴의 <b>"기본" 명도</b>로 매핑(시각적으로 거의 변화 없음).</li>
+        <li><b>이니셜 자동 생성</b>: 회원 이름에서 추출 → 이미 저장된 회원도 자동 적용. 사용자가 회원 편집 시 직접 수정 가능(2-4자 한도).</li>
+        <li><b>편집 모달</b>: 기존 "색상" 한 줄 → "휴 / 명도 / 이니셜" 3행으로 확장. 모바일에서는 세로 적층.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>토큰 명세 (제안)</h3>
+      <details class="tk" open>
+        <summary>CSS 변수 — 도메인 무관 구조</summary>
+<pre>:root {
+  /* 휴 인덱스 → 4명도. 도메인 프리셋이 이 값만 갈아끼움 */
+  --hue-1-deep:  #881337;  --hue-1-base:  #e11d48;
+  --hue-1-light: #fb7185;  --hue-1-pale:  #fecdd3;
+
+  --hue-6-deep:  #0c4a6e;  --hue-6-base:  #0284c7;
+  --hue-6-light: #38bdf8;  --hue-6-pale:  #bae6fd;
+
+  /* ... 10휴 × 4명도 = 40슬롯 */
+
+  /* 모노그램 자동 대비 */
+  --mono-on-deep:  #ffffff;
+  --mono-on-base:  #ffffff;
+  --mono-on-light: #1f2937;
+  --mono-on-pale:  #1f2937;
+}
+
+[data-domain="yoga"] {
+  --hue-1-deep:  #9f1239;  --hue-1-base:  #fda4af;
+  --hue-1-light: #fecdd3;  --hue-1-pale:  #ffe4e6;
+  /* ... */
+}
+
+[data-domain="golf"]   { /* 어스톤 오버라이드 */ }
+[data-domain="study"]  { /* 무지개 오버라이드 */ }</pre>
+      </details>
+    </div>
+  </section>
+
+  <!-- 7. NEXT -->
+  <section>
+    <h2><span class="num">7</span>다음 단계</h2>
+    <div class="card">
+      <ul>
+        <li><b>NOW</b> · 컨셉 A 인터랙션 프로토타입을 실제 회원 모달에 붙여 보기 (1-2일)</li>
+        <li><b>NEXT</b> · 이니셜 모노그램 자동 생성 + 캘린더 이벤트에 적용 (3-5일)</li>
+        <li><b>LATER</b> · 도메인 프리셋 시스템 구축 + 워크스페이스 설정 화면 (스프린트 1)</li>
+        <li><b>나중</b> · 팔레트 캐퍼시티 위젯 (회원 30명 이상 워크스페이스에 한해 노출)</li>
+      </ul>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  // ===== Concept A — hue → shade =====
+  const palette = [
+    {name:'산호',     deep:'#881337', base:'#e11d48', light:'#fb7185', pale:'#fecdd3', used:[1,0,1,0]},
+    {name:'귤',       deep:'#7c2d12', base:'#ea580c', light:'#fb923c', pale:'#fed7aa', used:[0,1,0,0]},
+    {name:'머스터드', deep:'#713f12', base:'#a16207', light:'#ca8a04', pale:'#fde68a', used:[0,1,1,0]},
+    {name:'숲',       deep:'#14532d', base:'#15803d', light:'#22c55e', pale:'#bbf7d0', used:[0,1,1,1]},
+    {name:'민트',     deep:'#134e4a', base:'#0d9488', light:'#2dd4bf', pale:'#99f6e4', used:[0,1,0,0]},
+    {name:'하늘',     deep:'#0c4a6e', base:'#0284c7', light:'#38bdf8', pale:'#bae6fd', used:[1,1,1,0]},
+    {name:'청보라',   deep:'#312e81', base:'#4f46e5', light:'#818cf8', pale:'#c7d2fe', used:[0,1,0,0]},
+    {name:'라벤더',   deep:'#4c1d95', base:'#7c3aed', light:'#a78bfa', pale:'#ddd6fe', used:[0,1,1,0]},
+    {name:'자두',     deep:'#701a75', base:'#c026d3', light:'#e879f9', pale:'#f5d0fe', used:[0,1,0,0]},
+    {name:'그라파이트',deep:'#1e293b',base:'#475569', light:'#94a3b8', pale:'#cbd5e1', used:[0,0,1,0]},
+  ];
+
+  const stage = document.getElementById('c1Stage');
+  const meta = document.getElementById('c1Meta');
+  let openIdx = -1;
+
+  function render(){
+    stage.innerHTML='';
+    palette.forEach((h,i)=>{
+      const hue = document.createElement('div');
+      hue.className = 'c1-hue' + (openIdx===i?' is-open':'');
+      hue.style.background = h.base;
+      hue.style.color = h.base;
+      hue.title = h.name;
+      const totalUsed = h.used.reduce((a,b)=>a+b,0);
+      if(totalUsed>0){
+        const pip = document.createElement('span');
+        pip.className='used-pip';
+        pip.textContent = totalUsed;
+        hue.appendChild(pip);
+      }
+      hue.onclick = ()=>{ openIdx = openIdx===i ? -1 : i; render(); };
+      stage.appendChild(hue);
+
+      if(openIdx===i){
+        const tray = document.createElement('div');
+        tray.className='c1-shades';
+        ['deep','base','light','pale'].forEach((k,si)=>{
+          const sh = document.createElement('div');
+          sh.className='c1-shade' + (h.used[si]?' is-used':'');
+          sh.style.background = h[k];
+          sh.style.color = h[k];
+          sh.title = h.name+' · '+k+(h.used[si]?' (사용 중)':'');
+          if(h.used[si]){
+            const dot = document.createElement('span');
+            dot.className='used-dot';
+            sh.appendChild(dot);
+          }
+          sh.onclick = (e)=>{
+            e.stopPropagation();
+            stage.querySelectorAll('.c1-shade').forEach(x=>x.classList.remove('is-selected'));
+            sh.classList.add('is-selected');
+            meta.textContent = '선택: '+h.name+' · '+k+'  →  '+h[k]+(h.used[si]?'  ⚠ 이미 사용 중':'  ✓ 새 색');
+          };
+          tray.appendChild(sh);
+        });
+        stage.appendChild(tray);
+      }
+    });
+  }
+  render();
+
+  // ===== Concept B — texture grid =====
+  const c2Grid = document.getElementById('c2Grid');
+  const hues = ['#e11d48','#ea580c','#0284c7','#15803d','#7c3aed','#0d9488','#a16207','#4f46e5','#c026d3','#475569'];
+  const labels = ['산호','귤','하늘','숲','라벤더','민트','머스터드','청보라','자두','그라파이트'];
+  const patterns = ['p-solid','p-dot','p-stripe','p-ring','p-grid'];
+  hues.forEach((c,i)=>{
+    const lbl = document.createElement('div'); lbl.className='l'; lbl.textContent=labels[i];
+    c2Grid.appendChild(lbl);
+    patterns.forEach(p=>{
+      const cell = document.createElement('div');
+      cell.className='c2-cell '+p;
+      cell.style.background = c;
+      if(p==='p-dot' || p==='p-stripe' || p==='p-grid'){
+        cell.style.backgroundColor = c;
+      }
+      c2Grid.appendChild(cell);
+    });
+  });
+
+  // ===== Concept D — capacity bar =====
+  const cap = document.getElementById('capBar');
+  const segs = [
+    {c:'#0284c7',w:10},{c:'#15803d',w:7.5},{c:'#7c3aed',w:7.5},{c:'#e11d48',w:7.5},
+    {c:'#a16207',w:7.5},{c:'#0d9488',w:5},{c:'#ea580c',w:5},{c:'#4f46e5',w:5},
+    {c:'#c026d3',w:2.5},{c:'#475569',w:2.5},{c:'#f1f5f9',w:40}
+  ];
+  segs.forEach(s=>{
+    const i = document.createElement('i');
+    i.style.width=s.w+'%';
+    i.style.background=s.c;
+    cap.appendChild(i);
+  });
+</script>
+
+</body>
+</html>

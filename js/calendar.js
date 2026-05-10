@@ -40,6 +40,14 @@ const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
 ));
 
+function initials(name) {
+  if (!name) return '?';
+  if (/[a-zA-Z]/.test(name)) {
+    return name.trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+  }
+  return name.slice(-2);
+}
+
 function toMin(t) {
   const [h, m] = t.split(':').map(Number);
   return h * 60 + m;
@@ -164,9 +172,12 @@ export function renderWeek(container, anchor, sessions, members, fitToSessions =
       const widthPct = 100 / e.totalLanes;
       const leftPct = e.laneIdx * widthPct;
       const endTime = computeEndTime(e.startTime, e.durationMin);
+      const mono = (!hideMemberName && !isPersonal)
+        ? `<span class="ev-mono" aria-hidden="true">${escapeHtml(initials(m.name))}</span>`
+        : '';
       const label = hideMemberName
         ? `<span class="ev-time">${escapeHtml(e.startTime)}~${escapeHtml(endTime)}</span>`
-        : `<span class="ev-name">${escapeHtml(display)}</span><span class="ev-time">${escapeHtml(e.startTime)}</span>`;
+        : `${mono}<span class="ev-name">${escapeHtml(display)}</span><span class="ev-time">${escapeHtml(e.startTime)}</span>`;
       const sid = escapeHtml(e.id || '');
       const status = e.status || 'scheduled';
       const evCls = ['wg-event'];
@@ -174,6 +185,8 @@ export function renderWeek(container, anchor, sessions, members, fitToSessions =
       if (isPastDay) evCls.push('is-past');
       if (status === 'canceled') evCls.push('is-canceled');
       if (status === 'completed') evCls.push('is-completed');
+      if (status === 'noshow_charged') evCls.push('is-noshow-charged');
+      if (status === 'noshow_free') evCls.push('is-noshow-free');
       html += `<div class="${evCls.join(' ')}" data-session-id="${sid}" style="top:${top}px;height:${height}px;left:calc(${leftPct}% + 1px);width:calc(${widthPct}% - 2px);background:${color}">${label}</div>`;
     }
 
@@ -263,6 +276,8 @@ export function renderMonth(container, anchor, sessions, members, opts = {}) {
         if (isPastDay) evCls.push('is-past');
         if (status === 'canceled') evCls.push('is-canceled');
         if (status === 'completed') evCls.push('is-completed');
+        if (status === 'noshow_charged') evCls.push('is-noshow-charged');
+        if (status === 'noshow_free') evCls.push('is-noshow-free');
         return `<span class="${evCls.join(' ')}" data-session-id="${sid}" style="background:${color}">${label}</span>`;
       }).join('');
     const holidayLine = holiday ? `<span class="day-holiday">${escapeHtml(holiday)}</span>` : '';
