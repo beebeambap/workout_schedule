@@ -1226,3 +1226,31 @@ textarea.ocr-text {
   .md-row-date { min-width: unset; font-size: 12px; }
   .md-row-dur  { display: none; }
 }
+
+/* ---------- 모바일 월간 뷰: 가로 스크롤 제거 + 이벤트 컬러 바 ---------- */
+@media (max-width: 479px) {
+  .month-grid {
+    min-width: unset; /* 강제 너비 해제 → 가로 스크롤 제거 */
+  }
+  .month-grid .day-head {
+    padding: 5px 2px;
+    font-size: 10px;
+  }
+  .month-grid .day {
+    min-height: 54px;
+    padding: 3px 2px;
+    gap: 2px;
+  }
+  .month-grid .day-num {
+    font-size: 11px;
+  }
+  .month-grid .day-holiday {
+    display: none; /* 공간 부족으로 공휴일명 숨김 */
+  }
+  .month-grid .ev {
+    font-size: 0; /* 텍스트 숨김 → 컬러 바만 표시 */
+    height: 5px;
+    padding: 0;
+    border-radius: 2px;
+  }
+}
