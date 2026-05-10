@@ -75,7 +75,8 @@ export const COLOR_SLOTS = COLOR_HUES.flatMap(hd =>
 
 // 호환성: 기존 코드가 참조하는 10-색 베이스 팔레트
 export const COLOR_PALETTE = COLOR_HUES.map(hd => ({ hex: hd.baseHex, name: hd.name }));
-export const COLOR_DEFAULT = BRAND_CORE;
+// 회원 색 기본값은 자동 보정된 틸 베이스 (BRAND_CORE는 흰 텍스트 AA 미달이라 팔레트 외 용도).
+export const COLOR_DEFAULT = COLOR_HUES[0].baseHex;
 
 // hex → hueIndex 룩업 (베이스 + 모든 셰이드)
 const HEX_TO_HUE = new Map();
