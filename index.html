@@ -96,43 +96,80 @@
   </section>
 
   <section id="view-import" class="view">
+    <header class="import-header">
+      <h2>스케줄 일괄 등록</h2>
+      <p class="hint">한 번에 여러 건의 수업을 등록할 때 사용하세요. 직접 입력 · 파일 업로드 · 텍스트 붙여넣기 중 편한 방식을 선택하면 됩니다.</p>
+    </header>
     <div class="tabs">
-      <button data-tab="typing" class="active">타이핑</button>
-      <button data-tab="csv">CSV</button>
-      <button data-tab="text">텍스트</button>
+      <button data-tab="typing" class="active">직접 입력</button>
+      <button data-tab="csv">파일 가져오기</button>
+      <button data-tab="text">붙여넣기</button>
       <button data-tab="xlsx" hidden>Excel</button>
     </div>
 
     <div id="tab-typing" class="tab active">
       <div class="import-section">
+        <p class="hint">한 건씩 폼에 입력해 미리보기에 쌓아두고, 마지막에 한꺼번에 등록합니다.</p>
         <form id="form-typing" class="grid-form">
           <label>회원명<input name="name" required placeholder="예: 김민수"></label>
           <label>날짜<input type="date" name="date" required></label>
           <label>시작 시간<input type="time" name="start" required></label>
-          <label>소요(분)<input type="number" name="duration" value="50" min="10" step="5" required></label>
-          <button type="submit" class="primary">미리보기에 추가</button>
+          <label>수업 시간
+            <span class="input-with-suffix">
+              <input type="number" name="duration" value="50" min="10" step="5" required>
+              <span class="suffix">분</span>
+            </span>
+          </label>
+          <button type="submit">+ 미리보기에 추가</button>
         </form>
       </div>
     </div>
 
     <div id="tab-csv" class="tab">
       <div class="import-section">
-        <p class="hint">헤더 형식: <code>member_name, date, start_time, duration_min</code><br>한국어도 지원: <code>회원명, 날짜, 시작시간, 소요시간</code></p>
-        <label class="import-file-label">
-          <span>CSV 파일 선택</span>
-          <input type="file" id="file-csv" accept=".csv,text/csv">
+        <p class="hint">CSV 파일을 끌어다 놓거나 클릭해 업로드하세요. 파일에 담긴 모든 행이 미리보기에 추가됩니다.</p>
+        <details class="import-format-guide">
+          <summary>CSV 형식 안내</summary>
+          <div class="format-body">
+            <p>첫 줄에 헤더, 다음 줄부터 데이터를 입력합니다.</p>
+            <p>지원 헤더(택1):</p>
+            <ul>
+              <li><code>member_name, date, start_time, duration_min</code></li>
+              <li><code>회원명, 날짜, 시작시간, 소요시간</code></li>
+            </ul>
+          </div>
+        </details>
+        <label class="dropzone" id="dropzone-csv">
+          <input type="file" id="file-csv" accept=".csv,text/csv" hidden>
+          <span class="dropzone-icon" aria-hidden="true">⬆</span>
+          <span class="dropzone-title">CSV 파일을 끌어다 놓거나 클릭해서 선택</span>
+          <span class="dropzone-sub">.csv 파일만 지원</span>
         </label>
         <div class="import-actions">
-          <button type="button" id="btn-sample-csv">샘플 CSV 다운로드</button>
+          <button type="button" id="btn-sample-csv" class="link-button">샘플 CSV 다운로드</button>
         </div>
       </div>
     </div>
 
     <div id="tab-text" class="tab">
       <div class="import-section">
-        <p class="hint">날짜를 한 줄에 쓰고 그 아래 회원명과 시간을 입력하세요.<br><code>2026-05-04</code> · <code>260504</code> · <code>2026년 5월 4일</code> 모두 인식합니다.</p>
+        <p class="hint">메신저나 메모장에서 복사한 일정을 그대로 붙여넣고 변환할 수 있습니다.</p>
+        <details class="import-format-guide">
+          <summary>입력 형식 안내</summary>
+          <div class="format-body">
+            <p>날짜를 한 줄에 쓰고 그 아래에 회원명과 시간을 입력하세요.</p>
+            <p>날짜 형식: <code>2026-05-04</code> · <code>260504</code> · <code>2026년 5월 4일</code> 모두 인식</p>
+            <pre class="format-example">260504
+김민수 09:00
+박지영 10:30
+
+260506
+김민수 09:00
+이도윤 18:00</pre>
+          </div>
+        </details>
         <textarea id="text-input" class="import-textarea" rows="9"
-          placeholder="260504&#10;김민수 09:00&#10;박지영 10:30&#10;&#10;260506&#10;김민수 09:00&#10;이도윤 18:00"></textarea>
+          placeholder="여기에 일정을 붙여넣거나 직접 입력하세요"></textarea>
         <div class="import-actions">
           <button type="button" id="btn-text-parse" class="primary">미리보기에 추가</button>
         </div>
@@ -145,14 +182,16 @@
     </div>
 
     <div id="preview" class="preview hidden">
-      <h3>미리보기 <span id="preview-count" class="hint"></span></h3>
-      <p class="hint">행을 직접 수정할 수 있습니다. 잘못된 행은 삭제 버튼으로 제거하세요. 모두 입력했으면 아래 <b>확정</b> 버튼을 누르면 캘린더로 이동합니다.</p>
+      <div class="preview-header">
+        <h3>미리보기 <span id="preview-count" class="preview-count-badge"></span></h3>
+        <p class="hint">행을 직접 수정하거나 삭제할 수 있습니다. 모두 확인했으면 아래 <b>캘린더에 등록</b>을 누르세요.</p>
+      </div>
       <div class="preview-table-wrap">
         <table id="preview-table"></table>
       </div>
       <div class="preview-actions">
-        <button id="btn-confirm">확정</button>
-        <button id="btn-cancel">취소</button>
+        <button id="btn-confirm" class="primary">캘린더에 등록</button>
+        <button id="btn-cancel">초기화</button>
       </div>
     </div>
   </section>

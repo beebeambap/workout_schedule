@@ -99,12 +99,37 @@ $('#form-typing').addEventListener('submit', (e) => {
 });
 
 // ---------- file inputs ----------
-$('#file-csv').addEventListener('change', async (e) => {
-  const f = e.target.files[0]; if (!f) return;
+async function handleCsvFile(f) {
+  if (!f) return;
   try { showPreview(await parseCSV(f)); }
   catch (err) { alert('CSV 파싱 오류: ' + err.message); }
+}
+
+$('#file-csv').addEventListener('change', async (e) => {
+  await handleCsvFile(e.target.files[0]);
   e.target.value = '';
 });
+
+// CSV 드롭존: 드래그&드롭 지원
+const _dzCsv = $('#dropzone-csv');
+if (_dzCsv) {
+  ['dragenter', 'dragover'].forEach(evt => {
+    _dzCsv.addEventListener(evt, (e) => {
+      e.preventDefault(); e.stopPropagation();
+      _dzCsv.classList.add('is-drag');
+    });
+  });
+  ['dragleave', 'drop'].forEach(evt => {
+    _dzCsv.addEventListener(evt, (e) => {
+      e.preventDefault(); e.stopPropagation();
+      _dzCsv.classList.remove('is-drag');
+    });
+  });
+  _dzCsv.addEventListener('drop', async (e) => {
+    const f = e.dataTransfer?.files?.[0];
+    if (f) await handleCsvFile(f);
+  });
+}
 
 $('#file-xlsx').addEventListener('change', async (e) => {
   const f = e.target.files[0]; if (!f) return;
@@ -153,7 +178,7 @@ function appendToPreview(sessions) {
 function renderPreviewTable(warnings) {
   const tbl = $('#preview-table');
   const cnt = $('#preview-count');
-  if (cnt) cnt.textContent = `(${(state.pending || []).length}건)`;
+  if (cnt) cnt.textContent = (state.pending || []).length || '';
   let html = '<thead><tr><th>회원</th><th>날짜</th><th>시작</th><th>분</th><th></th></tr></thead><tbody>';
   state.pending.forEach((s, i) => {
     html += `<tr data-idx="${i}">
