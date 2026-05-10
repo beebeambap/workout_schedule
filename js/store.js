@@ -1,12 +1,5 @@
 import { sb } from './supabase.js';
-
-const palette = ['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#06b6d4'];
-
-function colorFor(name) {
-  let h = 0;
-  for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return palette[h % palette.length];
-}
+import { pickNextColor } from './palette.js';
 
 const cache = {
   members: [],
@@ -101,7 +94,7 @@ export const Store = {
     }
     const { data, error } = await sb.from('members').insert({
       name: trimmed,
-      color: color || colorFor(trimmed),
+      color: color || pickNextColor(cache.members),
       memo: memo || '',
     }).select().single();
     if (error) throw error;

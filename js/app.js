@@ -7,6 +7,7 @@ import { sbReady, status as sbStatus } from './supabase.js';
 import { getSession, sendMagicLink, signOut, onAuthChange, updateUserMetadata } from './auth.js';
 import { preloadHolidays, ensureYearLoaded } from './holidays.js';
 import * as Pin from './pin.js';
+import { COLOR_PALETTE, COLOR_DEFAULT } from './palette.js';
 
 // Register service worker (PWA)
 if ('serviceWorker' in navigator) {
@@ -15,21 +16,6 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Curated 10-color palette: WCAG AA (≥4.5:1) with white text, perceptually
-// balanced lightness, avoids reds (danger/Sunday) and primary blue (Saturday/CTA).
-const COLOR_PALETTE = [
-  { hex: '#e11d48', name: '산호' },
-  { hex: '#ea580c', name: '귤' },
-  { hex: '#a16207', name: '머스터드' },
-  { hex: '#15803d', name: '숲' },
-  { hex: '#0d9488', name: '민트' },
-  { hex: '#0284c7', name: '하늘' },
-  { hex: '#4f46e5', name: '청보라' },
-  { hex: '#7c3aed', name: '라벤더' },
-  { hex: '#c026d3', name: '자두' },
-  { hex: '#475569', name: '그라파이트' },
-];
-const COLOR_DEFAULT = '#0284c7';
 const COLOR_MIGRATION_KEY = 'lf_color_migration_v1';
 
 const VIEW_STATE_KEY = 'lf_view_state';
@@ -65,15 +51,6 @@ const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())
 const esc = (s) => String(s).replace(/[&<>"']/g, c => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
 ));
-
-// 2-char monogram: Latin → first-letter initials; Korean/CJK → last 2 chars (skips family name)
-function initials(name) {
-  if (!name) return '?';
-  if (/[a-zA-Z]/.test(name)) {
-    return name.trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
-  }
-  return name.slice(-2);
-}
 
 // ---------- view switching ----------
 $$('.topbar nav button').forEach(b => {
@@ -434,7 +411,7 @@ function renderMembers() {
       ? `<span class="mr-memo">${esc(memoPreview)}</span>`
       : `<span class="mr-memo mr-memo-empty">메모 없음</span>`;
     return `<li class="member-row" data-id="${m.id}" style="--accent:${m.color}">
-      <span class="mr-mono" style="background:${m.color}" aria-hidden="true">${esc(initials(m.name))}</span>
+      <span class="mr-color" style="background:${m.color}"></span>
       <span class="mr-name">${esc(m.name)}</span>
       ${status}
       <span class="mr-count">${counts[m.id] || 0}건</span>
@@ -893,7 +870,6 @@ function renderMemberDetail() {
 
   $('#md-title').textContent = `${m.name}님 스케줄`;
   $('#md-color').style.background = m.color;
-  $('#md-color').textContent = initials(m.name);
   $('#md-name').textContent = m.name;
   $('#md-stats').textContent = `등록된 수업 ${sessions.length}건`;
   const memoEl = $('#md-memo');
