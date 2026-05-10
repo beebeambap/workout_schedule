@@ -507,6 +507,15 @@ function initColorPicker(inputEl, paletteEl) {
 
 initColorPicker($('#form-member-color'), $('#form-color-palette'));
 
+// 새 회원 추가 모달 열기
+$('#btn-add-member').addEventListener('click', () => {
+  $('#form-member').reset();
+  $('#form-member-color').value = COLOR_DEFAULT;
+  initColorPicker($('#form-member-color'), $('#form-color-palette'));
+  $('#modal-add-member').showModal();
+  setTimeout(() => $('#form-member [name="name"]')?.focus(), 50);
+});
+
 $('#form-member').addEventListener('submit', async (e) => {
   e.preventDefault();
   const fd = new FormData(e.target);
@@ -514,15 +523,14 @@ $('#form-member').addEventListener('submit', async (e) => {
   if (!name) return;
   try {
     await Store.ensureMember(name, fd.get('color'), String(fd.get('memo') || '').trim());
-    e.target.reset();
-    $('#form-member-color').value = COLOR_DEFAULT;
-    initColorPicker($('#form-member-color'), $('#form-color-palette'));
+    $('#modal-add-member').close();
+    flash(`${name}님이 추가되었습니다.`);
   } catch (err) {
     alert('저장 오류: ' + err.message);
   }
 });
 
-const memberFilters = { search: '', status: '' };
+const memberFilters = { search: '', status: '', sort: 'name' };
 $('#member-search')?.addEventListener('input', (e) => {
   memberFilters.search = e.target.value.trim().toLowerCase();
   renderMembers();
@@ -531,6 +539,16 @@ $('#member-status-filter')?.addEventListener('change', (e) => {
   memberFilters.status = e.target.value;
   renderMembers();
 });
+document.querySelectorAll('.sort-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.sort-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    memberFilters.sort = b.dataset.sort;
+    renderMembers();
+  });
+});
+
+const MEMBER_DOW = ['일', '월', '화', '수', '목', '금', '토'];
 
 function renderMembers() {
   const ul = $('#member-list');
@@ -542,7 +560,6 @@ function renderMembers() {
   if (memberFilters.status) {
     ms = ms.filter(m => (m.status || 'active') === memberFilters.status);
   }
-  const counts = Store.countByMember();
   if (!total) {
     ul.innerHTML = '<li class="ml-empty">등록된 회원이 없습니다. 가져오기에서 일정을 등록하면 자동으로 생성됩니다.</li>';
     return;
@@ -551,22 +568,59 @@ function renderMembers() {
     ul.innerHTML = '<li class="ml-empty">검색 결과가 없습니다.</li>';
     return;
   }
+
+  const counts = Store.countByMember();
+  const todayStr = ymd(new Date());
+
+  // 회원별 다음 예정 수업 계산
+  const nextMap = {};
+  Store.sessions()
+    .filter(s => s.memberId && s.date >= todayStr && (s.status || 'scheduled') === 'scheduled')
+    .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
+    .forEach(s => { if (!nextMap[s.memberId]) nextMap[s.memberId] = s; });
+
+  // 정렬
+  if (memberFilters.sort === 'count') {
+    ms = [...ms].sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0));
+  } else if (memberFilters.sort === 'next') {
+    ms = [...ms].sort((a, b) => {
+      const na = nextMap[a.id], nb = nextMap[b.id];
+      if (!na && !nb) return 0;
+      if (!na) return 1;
+      if (!nb) return -1;
+      return (na.date + na.startTime).localeCompare(nb.date + nb.startTime);
+    });
+  }
+  // 'name'은 store 기본 가나다 순 유지
+
   ul.innerHTML = ms.map(m => {
-    const memoPreview = (m.memo || '').replace(/\s+/g, ' ').trim();
-    const status = m.status && m.status !== 'active'
+    const statusHtml = m.status && m.status !== 'active'
       ? `<span class="mr-status mr-status-${esc(m.status)}">${statusLabel(m.status)}</span>`
       : '';
-    const memo = memoPreview
-      ? `<span class="mr-memo">${esc(memoPreview)}</span>`
-      : `<span class="mr-memo mr-memo-empty">메모 없음</span>`;
-    return `<li class="member-row" data-id="${m.id}" style="--accent:${m.color}">
+    const next = nextMap[m.id];
+    let nextHtml;
+    if (next) {
+      const d = new Date(next.date + 'T00:00:00');
+      const dow = MEMBER_DOW[d.getDay()];
+      nextHtml = `<span class="mr-next">${d.getMonth() + 1}/${d.getDate()}(${dow}) ${esc(next.startTime)}</span>`;
+    } else {
+      nextHtml = `<span class="mr-next mr-next-none">예정 없음</span>`;
+    }
+    return `<li class="member-row" data-id="${esc(m.id)}" style="--accent:${m.color}">
       <span class="mr-color" style="background:${m.color}"></span>
-      <span class="mr-name">${esc(m.name)}</span>
-      ${status}
-      <span class="mr-count">${counts[m.id] || 0}건</span>
-      ${memo}
+      <div class="mr-body">
+        <div class="mr-line1">
+          <span class="mr-name">${esc(m.name)}</span>
+          ${statusHtml}
+        </div>
+        <div class="mr-line2">
+          ${nextHtml}
+          <span class="mr-count">${counts[m.id] || 0}건</span>
+        </div>
+      </div>
     </li>`;
   }).join('');
+
   ul.querySelectorAll('li.member-row').forEach(li => {
     li.addEventListener('click', () => openMemberDetail(li.dataset.id));
   });
