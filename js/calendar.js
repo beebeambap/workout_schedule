@@ -40,6 +40,14 @@ const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
 ));
 
+function initials(name) {
+  if (!name) return '?';
+  if (/[a-zA-Z]/.test(name)) {
+    return name.trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+  }
+  return name.slice(-2);
+}
+
 function toMin(t) {
   const [h, m] = t.split(':').map(Number);
   return h * 60 + m;
@@ -164,9 +172,12 @@ export function renderWeek(container, anchor, sessions, members, fitToSessions =
       const widthPct = 100 / e.totalLanes;
       const leftPct = e.laneIdx * widthPct;
       const endTime = computeEndTime(e.startTime, e.durationMin);
+      const mono = (!hideMemberName && !isPersonal)
+        ? `<span class="ev-mono" aria-hidden="true">${escapeHtml(initials(m.name))}</span>`
+        : '';
       const label = hideMemberName
         ? `<span class="ev-time">${escapeHtml(e.startTime)}~${escapeHtml(endTime)}</span>`
-        : `<span class="ev-name">${escapeHtml(display)}</span><span class="ev-time">${escapeHtml(e.startTime)}</span>`;
+        : `${mono}<span class="ev-name">${escapeHtml(display)}</span><span class="ev-time">${escapeHtml(e.startTime)}</span>`;
       const sid = escapeHtml(e.id || '');
       const status = e.status || 'scheduled';
       const evCls = ['wg-event'];

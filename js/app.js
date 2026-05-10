@@ -66,6 +66,15 @@ const esc = (s) => String(s).replace(/[&<>"']/g, c => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
 ));
 
+// 2-char monogram: Latin → first-letter initials; Korean/CJK → last 2 chars (skips family name)
+function initials(name) {
+  if (!name) return '?';
+  if (/[a-zA-Z]/.test(name)) {
+    return name.trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+  }
+  return name.slice(-2);
+}
+
 // ---------- view switching ----------
 $$('.topbar nav button').forEach(b => {
   b.addEventListener('click', () => switchView(b.dataset.view));
@@ -425,7 +434,7 @@ function renderMembers() {
       ? `<span class="mr-memo">${esc(memoPreview)}</span>`
       : `<span class="mr-memo mr-memo-empty">메모 없음</span>`;
     return `<li class="member-row" data-id="${m.id}" style="--accent:${m.color}">
-      <span class="mr-color" style="background:${m.color}"></span>
+      <span class="mr-mono" style="background:${m.color}" aria-hidden="true">${esc(initials(m.name))}</span>
       <span class="mr-name">${esc(m.name)}</span>
       ${status}
       <span class="mr-count">${counts[m.id] || 0}건</span>
@@ -884,6 +893,7 @@ function renderMemberDetail() {
 
   $('#md-title').textContent = `${m.name}님 스케줄`;
   $('#md-color').style.background = m.color;
+  $('#md-color').textContent = initials(m.name);
   $('#md-name').textContent = m.name;
   $('#md-stats').textContent = `등록된 수업 ${sessions.length}건`;
   const memoEl = $('#md-memo');
