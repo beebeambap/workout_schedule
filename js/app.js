@@ -7,7 +7,7 @@ import { sbReady, status as sbStatus } from './supabase.js';
 import { getSession, sendMagicLink, signOut, onAuthChange, updateUserMetadata } from './auth.js';
 import { preloadHolidays, ensureYearLoaded } from './holidays.js';
 import * as Pin from './pin.js';
-import { COLOR_PALETTE, COLOR_DEFAULT, COLOR_SLOTS } from './palette.js';
+import { COLOR_PALETTE, COLOR_DEFAULT, COLOR_SLOTS, COLOR_HUES, nearestSlotColor } from './palette.js';
 
 // Register service worker (PWA)
 if ('serviceWorker' in navigator) {
@@ -16,7 +16,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-const COLOR_MIGRATION_KEY = 'lf_color_migration_v1';
+const COLOR_MIGRATION_KEY = 'lf_color_migration_v2';
 
 const VIEW_STATE_KEY = 'lf_view_state';
 const state = {
@@ -280,40 +280,18 @@ async function commitSessions(arr) {
 }
 
 // ---------- members ----------
-function hexToRgb(hex) {
-  const h = (hex || '').replace('#', '');
-  if (h.length !== 6) return null;
-  const n = parseInt(h, 16);
-  if (Number.isNaN(n)) return null;
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
-function nearestPaletteColor(hex) {
-  const target = hexToRgb(hex);
-  if (!target) return COLOR_DEFAULT;
-  let best = COLOR_PALETTE[0].hex;
-  let bestDist = Infinity;
-  for (const c of COLOR_PALETTE) {
-    const rgb = hexToRgb(c.hex);
-    const d = (rgb[0] - target[0]) ** 2 + (rgb[1] - target[1]) ** 2 + (rgb[2] - target[2]) ** 2;
-    if (d < bestDist) { bestDist = d; best = c.hex; }
-  }
-  return best;
-}
 async function migrateMemberColors() {
   if (localStorage.getItem(COLOR_MIGRATION_KEY)) return;
-  const validHexes = new Set([
-    ...COLOR_PALETTE.map(c => c.hex.toLowerCase()),
-    ...COLOR_SLOTS.map(s => s.hex.toLowerCase()),
-  ]);
+  const validHexes = new Set(COLOR_SLOTS.map(s => s.hex.toLowerCase()));
   const members = Store.members();
   const toMigrate = members.filter(m => m.color && !validHexes.has(m.color.toLowerCase()));
   if (!toMigrate.length) {
     localStorage.setItem(COLOR_MIGRATION_KEY, '1');
     return;
   }
-  console.log('[color-migration] migrating', toMigrate.length, '명');
+  console.log('[color-migration v2] migrating', toMigrate.length, '명');
   const results = await Promise.all(toMigrate.map(m => {
-    const newColor = nearestPaletteColor(m.color);
+    const newColor = nearestSlotColor(m.color);
     return Store.updateMember(m.id, {
       name: m.name,
       color: newColor,
@@ -329,29 +307,104 @@ async function migrateMemberColors() {
   }
 }
 
+// 컬러 피커: 10휴 행 + 클릭 시 선택된 휴의 10셰이드만 disclosure로 펼침.
 function initColorPicker(inputEl, paletteEl) {
   const customBtn = inputEl.closest('.color-custom-btn');
+
+  paletteEl.classList.add('color-picker');
+  paletteEl.innerHTML = `
+    <div class="color-hue-row" role="radiogroup" aria-label="컬러 선택">
+      ${COLOR_HUES.map(hd => `
+        <button type="button"
+                class="color-hue${hd.isCore ? ' is-core' : ''}"
+                data-hi="${hd.hueIndex}"
+                style="background:${hd.baseHex}"
+                title="${esc(hd.name)}${hd.isCore ? ' · 레슨핏 시그니처' : ''}"
+                aria-label="${esc(hd.name)}"
+                aria-expanded="false"></button>
+      `).join('')}
+    </div>
+    <div class="color-shade-panel" hidden></div>
+  `;
+
+  const hueRow = paletteEl.querySelector('.color-hue-row');
+  const shadePanel = paletteEl.querySelector('.color-shade-panel');
+  let openHueIndex = null;
+
+  function renderShades(hueIndex) {
+    const hd = COLOR_HUES[hueIndex];
+    const v = (inputEl.value || '').toLowerCase();
+    shadePanel.innerHTML = `
+      <div class="color-shade-label">${esc(hd.name)} 명도</div>
+      <div class="color-shade-row">
+        ${hd.shades.map(s => `
+          <button type="button"
+                  class="color-shade${s.aa ? '' : ' no-aa'}${s.hex.toLowerCase() === v ? ' selected' : ''}"
+                  data-color="${s.hex}"
+                  style="background:${s.hex}"
+                  title="${esc(hd.name)} ${s.shadeIndex + 1}${s.aa ? '' : ' · 흰 텍스트 대비 낮음'}"
+                  aria-label="${esc(hd.name)} 명도 ${s.shadeIndex + 1}"></button>
+        `).join('')}
+      </div>
+    `;
+    shadePanel.querySelectorAll('.color-shade').forEach(b => {
+      b.addEventListener('click', () => { inputEl.value = b.dataset.color; sync(); });
+    });
+  }
+
+  function openShades(hi) {
+    openHueIndex = hi;
+    hueRow.querySelectorAll('.color-hue').forEach((b, i) => {
+      const isOpen = i === hi;
+      b.classList.toggle('open', isOpen);
+      b.setAttribute('aria-expanded', String(isOpen));
+    });
+    renderShades(hi);
+    shadePanel.hidden = false;
+  }
+  function closeShades() {
+    openHueIndex = null;
+    hueRow.querySelectorAll('.color-hue').forEach(b => {
+      b.classList.remove('open');
+      b.setAttribute('aria-expanded', 'false');
+    });
+    shadePanel.hidden = true;
+    shadePanel.innerHTML = '';
+  }
+
+  hueRow.querySelectorAll('.color-hue').forEach(b => {
+    b.addEventListener('click', () => {
+      const hi = parseInt(b.dataset.hi, 10);
+      if (openHueIndex === hi) closeShades();
+      else openShades(hi);
+    });
+  });
+
   function sync() {
     const v = (inputEl.value || '').toLowerCase();
+    let matchedHue = -1;
     let inPalette = false;
-    paletteEl.querySelectorAll('.color-swatch').forEach(b => {
-      const match = b.dataset.color.toLowerCase() === v;
-      b.classList.toggle('selected', match);
-      if (match) inPalette = true;
+    for (const hd of COLOR_HUES) {
+      if (hd.shades.some(s => s.hex.toLowerCase() === v)) {
+        matchedHue = hd.hueIndex;
+        inPalette = true;
+        break;
+      }
+    }
+    hueRow.querySelectorAll('.color-hue').forEach((b, i) => {
+      b.classList.toggle('active', i === matchedHue);
     });
+    if (openHueIndex !== null) {
+      shadePanel.querySelectorAll('.color-shade').forEach(b => {
+        b.classList.toggle('selected', b.dataset.color.toLowerCase() === v);
+      });
+    }
     if (customBtn) {
       customBtn.classList.toggle('custom-active', !inPalette && !!v);
       customBtn.style.background = (!inPalette && v) ? v : '';
     }
   }
-  // 10×10 grid: rows = shades (dark→light), cols = hues (left→right)
-  const rows = Array.from({length: 10}, (_, si) => COLOR_SLOTS.filter(s => s.shadeIndex === si));
-  paletteEl.innerHTML = rows.flatMap(row => row.map(slot =>
-    `<button type="button" class="color-swatch${slot.aa ? '' : ' no-aa'}" data-color="${slot.hex}" style="background:${slot.hex}" title="${slot.name}" aria-label="${slot.name}"></button>`
-  )).join('');
-  paletteEl.querySelectorAll('.color-swatch').forEach(b => {
-    b.addEventListener('click', () => { inputEl.value = b.dataset.color; sync(); });
-  });
+
   if (inputEl._cpSync) inputEl.removeEventListener('input', inputEl._cpSync);
   inputEl._cpSync = sync;
   inputEl.addEventListener('input', sync);
