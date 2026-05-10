@@ -314,7 +314,49 @@ async function migrateMemberColors() {
   }
 }
 
-// 컬러 피커: 10휴 행(5×2) + 클릭 시 선택된 휴의 10셰이드만 disclosure로 펼침.
+// 풍선모달 싱글턴 — 두 색상 피커가 공유
+let _shadePopup = null;
+let _shadePopupCleanup = null;
+
+function getShadePopup() {
+  if (!_shadePopup) {
+    _shadePopup = document.createElement('div');
+    _shadePopup.className = 'color-shade-popup';
+    _shadePopup.hidden = true;
+    document.body.appendChild(_shadePopup);
+  }
+  return _shadePopup;
+}
+
+function closeShadePopupGlobal() {
+  if (_shadePopup) { _shadePopup.hidden = true; _shadePopup.innerHTML = ''; }
+  if (_shadePopupCleanup) { _shadePopupCleanup(); _shadePopupCleanup = null; }
+}
+
+function positionShadePopup(popup, chipEl) {
+  popup.style.visibility = 'hidden';
+  popup.style.top = '0px';
+  popup.style.left = '0px';
+  const rect = chipEl.getBoundingClientRect();
+  const pw = popup.offsetWidth;
+  const ph = popup.offsetHeight;
+  const spaceBelow = window.innerHeight - rect.bottom - 8;
+  const spaceAbove = rect.top - 8;
+  let top, dir;
+  if (spaceBelow >= ph || spaceBelow >= spaceAbove) {
+    top = rect.bottom + 6; dir = 'down';
+  } else {
+    top = rect.top - ph - 6; dir = 'up';
+  }
+  let left = rect.left + rect.width / 2 - pw / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
+  popup.dataset.dir = dir;
+  popup.style.top = top + 'px';
+  popup.style.left = left + 'px';
+  popup.style.visibility = '';
+}
+
+// 컬러 피커: 10휴 칩(5×2 그리드) + 칩 클릭 시 명도 풍선모달
 function initColorPicker(inputEl, paletteEl) {
   paletteEl.classList.add('color-picker');
   paletteEl.innerHTML = `
@@ -329,18 +371,21 @@ function initColorPicker(inputEl, paletteEl) {
                 aria-expanded="false"></button>
       `).join('')}
     </div>
-    <div class="color-shade-panel" hidden></div>
   `;
 
   const hueRow = paletteEl.querySelector('.color-hue-row');
-  const shadePanel = paletteEl.querySelector('.color-shade-panel');
   let openHueIndex = null;
 
-  function renderShades(hueIndex) {
-    const hd = COLOR_HUES[hueIndex];
+  function openPopup(hi, chipEl) {
+    openHueIndex = hi;
+    const popup = getShadePopup();
+    const hd = COLOR_HUES[hi];
     const v = (inputEl.value || '').toLowerCase();
-    shadePanel.innerHTML = `
-      <div class="color-shade-label">${esc(hd.name)} 명도</div>
+    popup.innerHTML = `
+      <div class="color-shade-header">
+        <span class="color-shade-label">${esc(hd.name)}</span>
+        <button type="button" class="color-shade-close" aria-label="닫기">&times;</button>
+      </div>
       <div class="color-shade-row">
         ${hd.shades.map(s => `
           <button type="button"
@@ -352,36 +397,53 @@ function initColorPicker(inputEl, paletteEl) {
         `).join('')}
       </div>
     `;
-    shadePanel.querySelectorAll('.color-shade').forEach(b => {
-      b.addEventListener('click', () => { inputEl.value = b.dataset.color; sync(); });
+    popup.hidden = false;
+    positionShadePopup(popup, chipEl);
+
+    popup.querySelectorAll('.color-shade').forEach(b => {
+      b.addEventListener('click', () => { inputEl.value = b.dataset.color; sync(); closePopup(); });
+    });
+    popup.querySelector('.color-shade-close').addEventListener('click', closePopup);
+
+    const onOutside = (e) => { if (!popup.contains(e.target) && !hueRow.contains(e.target)) closePopup(); };
+    const onKey = (e) => { if (e.key === 'Escape') closePopup(); };
+    const onScroll = () => closePopup();
+    setTimeout(() => {
+      document.addEventListener('mousedown', onOutside);
+      document.addEventListener('keydown', onKey);
+      window.addEventListener('scroll', onScroll, true);
+    }, 0);
+    _shadePopupCleanup = () => {
+      document.removeEventListener('mousedown', onOutside);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', onScroll, true);
+      hueRow.querySelectorAll('.color-hue').forEach(b => {
+        b.classList.remove('open');
+        b.setAttribute('aria-expanded', 'false');
+      });
+      openHueIndex = null;
+    };
+
+    hueRow.querySelectorAll('.color-hue').forEach((b, i) => {
+      b.classList.toggle('open', i === hi);
+      b.setAttribute('aria-expanded', String(i === hi));
     });
   }
 
-  function openShades(hi) {
-    openHueIndex = hi;
-    hueRow.querySelectorAll('.color-hue').forEach((b, i) => {
-      const isOpen = i === hi;
-      b.classList.toggle('open', isOpen);
-      b.setAttribute('aria-expanded', String(isOpen));
-    });
-    renderShades(hi);
-    shadePanel.hidden = false;
-  }
-  function closeShades() {
+  function closePopup() {
+    closeShadePopupGlobal();
     openHueIndex = null;
     hueRow.querySelectorAll('.color-hue').forEach(b => {
       b.classList.remove('open');
       b.setAttribute('aria-expanded', 'false');
     });
-    shadePanel.hidden = true;
-    shadePanel.innerHTML = '';
   }
 
   hueRow.querySelectorAll('.color-hue').forEach(b => {
     b.addEventListener('click', () => {
       const hi = parseInt(b.dataset.hi, 10);
-      if (openHueIndex === hi) closeShades();
-      else openShades(hi);
+      if (openHueIndex === hi) closePopup();
+      else openPopup(hi, b);
     });
   });
 
@@ -389,16 +451,13 @@ function initColorPicker(inputEl, paletteEl) {
     const v = (inputEl.value || '').toLowerCase();
     let matchedHue = -1;
     for (const hd of COLOR_HUES) {
-      if (hd.shades.some(s => s.hex.toLowerCase() === v)) {
-        matchedHue = hd.hueIndex;
-        break;
-      }
+      if (hd.shades.some(s => s.hex.toLowerCase() === v)) { matchedHue = hd.hueIndex; break; }
     }
     hueRow.querySelectorAll('.color-hue').forEach((b, i) => {
       b.classList.toggle('active', i === matchedHue);
     });
-    if (openHueIndex !== null) {
-      shadePanel.querySelectorAll('.color-shade').forEach(b => {
+    if (_shadePopup && !_shadePopup.hidden) {
+      _shadePopup.querySelectorAll('.color-shade').forEach(b => {
         b.classList.toggle('selected', b.dataset.color.toLowerCase() === v);
       });
     }
