@@ -359,6 +359,14 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px; }
 .month-grid .ev {
   font-size: 11px; padding: 2px 5px; border-radius: 3px;
   color: #fff; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  display: flex; align-items: center; gap: 0;
+}
+.month-grid .ev .ev-name {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;
+  font-weight: 600;
+}
+.month-grid .ev .ev-time {
+  flex-shrink: 0; font-size: 0.9em; opacity: 0.85;
 }
 
 /* Tabs */
@@ -1291,13 +1299,14 @@ textarea.ocr-text {
   .month-grid .day-holiday {
     display: none; /* 공간 부족으로 공휴일명 숨김 */
   }
-  /* 이벤트 칩: 텍스트 표시 + 터치 타겟 확보 (이전의 font-size:0 / height:5px 복원) */
+  /* 이벤트 칩: 이름만 표시 (시간 숨김), 터치 타겟 확보 */
   .month-grid .ev {
     font-size: 10px;
     height: auto;
-    min-height: 18px;
+    min-height: 20px;
     padding: 2px 4px;
     border-radius: 3px;
-    line-height: 1.2;
+    line-height: 1.3;
   }
+  .month-grid .ev .ev-time { display: none; }
 }
