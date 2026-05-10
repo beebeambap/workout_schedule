@@ -81,10 +81,15 @@
           <option value="">전체 회원</option>
         </select>
         <button id="btn-add-personal" title="트레이너 본인 일정 추가">+ 내 일정</button>
-        <button id="btn-export">JPG 저장</button>
-        <button id="btn-export-all" title="모든 회원을 ZIP으로 저장">회원별 일괄(ZIP)</button>
-        <button id="btn-stats-xlsx" title="월별 통계 엑셀">통계 XLSX</button>
-        <button id="btn-export-ics" title="구글/애플 캘린더 가져오기용 .ics">캘린더(.ics)</button>
+        <div class="export-menu" id="export-menu">
+          <button id="btn-export-menu" title="내보내기 옵션">내보내기 ▾</button>
+          <div class="export-menu-list" id="export-menu-list" hidden>
+            <button id="btn-export">JPG 저장</button>
+            <button id="btn-export-all">회원별 일괄 (ZIP)</button>
+            <button id="btn-stats-xlsx">통계 XLSX</button>
+            <button id="btn-export-ics">캘린더 (.ics)</button>
+          </div>
+        </div>
       </div>
     </div>
     <div id="calendar" class="calendar-canvas"></div>

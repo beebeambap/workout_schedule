@@ -151,12 +151,27 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px; }
   background: var(--surface-soft); border-color: var(--text-muted);
 }
 #period-label { font-weight: 600; margin: 0 8px; min-width: 180px; text-align: center; }
-#btn-export, #btn-export-all, #btn-stats-xlsx, #btn-export-ics {
-  background: var(--surface); color: var(--text); border-color: var(--border-strong);
+/* 내보내기 드롭다운 */
+.export-menu { position: relative; }
+.export-menu-list {
+  position: absolute; right: 0; top: calc(100% + 4px);
+  z-index: 300;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  display: flex; flex-direction: column;
+  min-width: 160px; overflow: hidden;
 }
-#btn-export:hover, #btn-export-all:hover, #btn-stats-xlsx:hover, #btn-export-ics:hover {
-  background: var(--surface-soft); border-color: var(--text-muted);
+.export-menu-list[hidden] { display: none; }
+.export-menu-list button {
+  width: 100%; text-align: left; padding: 9px 14px;
+  border: none; border-radius: 0;
+  background: none; cursor: pointer; font: inherit; font-size: 13px;
+  color: var(--text);
+  transition: background 0.1s;
 }
+.export-menu-list button:hover { background: var(--surface-soft); }
 
 .calendar-canvas {
   background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
@@ -572,10 +587,19 @@ textarea.ocr-text {
 
 /* ---------- Color palette ---------- */
 
-/* Color picker: 10휴 칩 1줄 + 클릭 시 명도 풍선모달 */
+/* Color picker: 10휴 칩 1줄 + 선택 스와치 + 클릭 시 명도 풍선모달 */
 .color-picker { display: block; }
+.color-picker-bar { display: flex; align-items: center; gap: 8px; }
+.color-current-swatch {
+  flex-shrink: 0;
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  border: 2px solid rgba(0,0,0,0.12);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.04) inset;
+  background: var(--primary);
+}
 .color-hue-row {
-  display: flex; flex-wrap: nowrap; gap: 4px;
+  flex: 1; display: flex; flex-wrap: nowrap; gap: 4px;
 }
 .color-hue {
   flex: 1; min-width: 0; height: 28px;
