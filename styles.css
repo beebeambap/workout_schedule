@@ -201,6 +201,8 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px; }
   border-bottom: 1px solid #e5e7eb;
 }
 .wg-day-head.today { background: var(--warn-bg); }
+.wg-day-head.is-past-day { color: var(--text-muted); }
+.wg-day-col.is-past-day { background: rgba(0,0,0,0.025); }
 .wg-body {
   position: relative;
   display: grid;
@@ -302,6 +304,7 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px; }
   display: flex; flex-direction: column; gap: 2px;
 }
 .month-grid .day.other { background: #f9fafb; color: #9ca3af; }
+.month-grid .day.is-past-day:not(.other) { background: rgba(0,0,0,0.025); }
 .month-grid .day.today .day-num {
   background: #111827; color: #fff;
   border-radius: 999px; padding: 1px 7px; display: inline-block;

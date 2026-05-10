@@ -318,13 +318,16 @@ async function migrateMemberColors() {
 let _shadePopup = null;
 let _shadePopupCleanup = null;
 
-function getShadePopup() {
+function getShadePopup(contextEl) {
   if (!_shadePopup) {
     _shadePopup = document.createElement('div');
     _shadePopup.className = 'color-shade-popup';
     _shadePopup.hidden = true;
-    document.body.appendChild(_shadePopup);
   }
+  // <dialog> 안의 picker는 팝업도 dialog 내부에 넣어야 top-layer 위에 표시됨
+  const dlg = contextEl?.closest('dialog');
+  const target = dlg || document.body;
+  if (_shadePopup.parentNode !== target) target.appendChild(_shadePopup);
   return _shadePopup;
 }
 
@@ -378,7 +381,7 @@ function initColorPicker(inputEl, paletteEl) {
 
   function openPopup(hi, chipEl) {
     openHueIndex = hi;
-    const popup = getShadePopup();
+    const popup = getShadePopup(chipEl);
     const hd = COLOR_HUES[hi];
     const v = (inputEl.value || '').toLowerCase();
     popup.innerHTML = `
