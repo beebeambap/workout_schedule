@@ -197,17 +197,14 @@
   </section>
 
   <section id="view-members" class="view">
-    <form id="form-member" class="grid-form">
-      <label>회원명<input name="name" required></label>
-      <label>메모(선택)<input name="memo" placeholder="특이사항, 부상 이력 등"></label>
-      <div class="form-color-row">
-        <div class="color-picker-wrap">
-          <div class="color-palette" id="form-color-palette"></div>
-          <input type="hidden" name="color" id="form-member-color" value="#0b837d">
-        </div>
+    <div class="member-page-toolbar">
+      <div class="member-sort-group" role="group" aria-label="정렬">
+        <button class="sort-btn active" data-sort="name">이름순</button>
+        <button class="sort-btn" data-sort="count">수업 많은 순</button>
+        <button class="sort-btn" data-sort="next">다음 수업 순</button>
       </div>
-      <button type="submit">회원 추가</button>
-    </form>
+      <button id="btn-add-member" class="primary">+ 새 회원</button>
+    </div>
     <div class="member-filters">
       <input id="member-search" type="search" placeholder="이름 검색...">
       <select id="member-status-filter">
@@ -225,6 +222,29 @@
   <span>최종 업데이트: <span id="last-update">…</span></span>
   <span class="watermark">© beebeambap</span>
 </footer>
+
+<dialog id="modal-add-member" class="modal">
+  <div class="modal-content">
+    <button class="modal-close" data-close aria-label="닫기">&times;</button>
+    <h3>새 회원 추가</h3>
+    <div class="modal-body">
+      <form id="form-member">
+        <label>회원명<input name="name" required autocomplete="off"></label>
+        <label>메모(선택)<input name="memo" placeholder="특이사항, 부상 이력 등"></label>
+        <div class="form-color-row">
+          <div class="color-picker-wrap">
+            <div class="color-palette" id="form-color-palette"></div>
+            <input type="hidden" name="color" id="form-member-color" value="#0b837d">
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-actions">
+      <button type="submit" form="form-member" class="primary">추가</button>
+      <button type="button" data-close>취소</button>
+    </div>
+  </div>
+</dialog>
 
 <dialog id="modal-session" class="modal">
   <div class="modal-content">
