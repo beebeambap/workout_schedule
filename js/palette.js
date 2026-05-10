@@ -42,9 +42,10 @@ const HUE_DEFS = [
   { h: 141, name: '숲' },
 ];
 
-// 베이스 셰이드 기준 오프셋. 인덱스 5(=offset 0)가 베이스 = 휴 칩에 표시되는 색.
-const SHADE_OFFSETS = [-20, -16, -12, -8, -4, 0, 5, 11, 18, 26];
-const BASE_SHADE_INDEX = 5;
+// 베이스 셰이드 기준 오프셋. 인덱스 1(=offset 0)이 베이스 = 휴 칩에 표시되는 메인 색.
+// shade 0(왼쪽 첫 번째)은 한 단계 더 어두운 톤, shade 2~9는 점점 밝아짐.
+const SHADE_OFFSETS = [-4, 0, 4, 8, 12, 16, 21, 27, 34, 42];
+const BASE_SHADE_INDEX = 1;
 
 // AA 통과(흰 텍스트 contrast≥4.5)하는 가장 밝은 L을 lMax 이하에서 탐색.
 function findAaBaseL(h, s, lMax) {
