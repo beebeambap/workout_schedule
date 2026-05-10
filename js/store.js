@@ -174,6 +174,10 @@ export const Store = {
     if (!cur) return null;
     const update = {};
     if (patch.status != null) update.status = patch.status;
+    if (patch.title != null) update.title = patch.title;
+    if (patch.date != null) update.date = patch.date;
+    if (patch.startTime != null) update.start_time = patch.startTime;
+    if (patch.durationMin != null) update.duration_min = patch.durationMin;
     if (!Object.keys(update).length) return cur;
     const { data, error } = await sb.from('sessions').update(update).eq('id', id).select().single();
     if (error) throw error;

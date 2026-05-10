@@ -1115,3 +1115,37 @@ textarea.ocr-text {
   /* Mobile primary CTA bumps to lg (44px) for touch target */
   .btn-mobile-cta { min-height: 44px; padding: 11px 18px; font-size: 15px; }
 }
+
+/* ---------- Member detail: session list view ---------- */
+.md-empty-hint {
+  margin: 24px 0; text-align: center; color: #9ca3af; font-size: 14px;
+}
+.md-session-list {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.md-session-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 8px;
+  background: #fff; border: 1px solid #e5e7eb;
+  font-size: 13px; cursor: pointer;
+  transition: background 0.12s;
+}
+.md-session-row:hover { background: #f9fafb; }
+.md-session-row.md-past { opacity: 0.6; }
+.md-row-date { font-weight: 600; color: #374151; min-width: 130px; }
+.md-row-time { color: #4b5563; flex: 1; }
+.md-row-dur  { color: #9ca3af; font-size: 12px; min-width: 36px; text-align: right; }
+.md-row-status { margin-left: auto; }
+
+/* Status badges */
+.md-badge-scheduled    { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; background: #e0f2fe; color: #0369a1; }
+.md-badge-completed    { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; background: #dcfce7; color: #16a34a; }
+.md-badge-canceled     { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; }
+.md-badge-noshow_charged { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; background: #fef3c7; color: #b45309; }
+.md-badge-noshow_free  { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; background: #fce7f3; color: #be185d; }
+
+@media (max-width: 500px) {
+  .md-row-date { min-width: unset; font-size: 12px; }
+  .md-row-dur  { display: none; }
+}

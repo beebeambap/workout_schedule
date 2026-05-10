@@ -1,6 +1,6 @@
 import { Store } from './store.js';
 import { parseCSV, parseXLSX, parseFreeText } from './parser.js';
-import { renderWeek, renderMonth, computeEndTime, HOUR_HEIGHT } from './calendar.js';
+import { renderWeek, renderMonth, computeEndTime, HOUR_HEIGHT, startOfWeek, addDays } from './calendar.js';
 import { exportSchedule, exportScheduleBlob } from './exporter.js';
 import { buildICS } from './ics.js';
 import { sbReady, status as sbStatus } from './supabase.js';
@@ -699,7 +699,22 @@ function renderCalendar({ scrollToNow = false } = {}) {
 }
 
 // ---------- trainer's personal events ----------
+let _editingPersonalId = null;
+
+function openEditPersonal(s) {
+  _editingPersonalId = s.id;
+  $('#pe-modal-title').textContent = '내 일정 편집';
+  $('#pe-title').value = s.title || '';
+  $('#pe-date').value = s.date;
+  $('#pe-start').value = s.startTime;
+  $('#pe-duration').value = s.durationMin || 60;
+  $('#modal-personal').showModal();
+  setTimeout(() => $('#pe-title').focus(), 50);
+}
+
 $('#btn-add-personal').addEventListener('click', () => {
+  _editingPersonalId = null;
+  $('#pe-modal-title').textContent = '내 일정 추가';
   $('#pe-title').value = '';
   $('#pe-date').value = ymd(state.anchor || new Date());
   $('#pe-start').value = '';
@@ -719,15 +734,25 @@ $('#pe-save').addEventListener('click', async () => {
   peSaveBusy = true;
   const btn = $('#pe-save'); btn.disabled = true;
   try {
-    await Store.addSessions([{
-      memberId: null,
-      title: title || '내 일정',
-      date,
-      startTime: start,
-      durationMin: Number.isFinite(duration) ? duration : 60,
-    }]);
+    if (_editingPersonalId) {
+      await Store.updateSession(_editingPersonalId, {
+        title: title || '내 일정',
+        date,
+        startTime: start,
+        durationMin: Number.isFinite(duration) ? duration : 60,
+      });
+      flash('일정이 수정되었습니다.');
+    } else {
+      await Store.addSessions([{
+        memberId: null,
+        title: title || '내 일정',
+        date,
+        startTime: start,
+        durationMin: Number.isFinite(duration) ? duration : 60,
+      }]);
+      flash('일정이 추가되었습니다.');
+    }
     $('#modal-personal').close();
-    flash('일정이 추가되었습니다.');
   } catch (err) {
     console.error(err);
     alert('저장 오류: ' + (err?.message || err) +
@@ -844,7 +869,12 @@ function openSessionModal(sessionId) {
       <div class="modal-row"><span class="modal-label">날짜</span><span class="modal-value">${esc(s.date)}</span></div>
       <div class="modal-row"><span class="modal-label">시간</span><span class="modal-value">${esc(s.startTime)} ~ ${esc(endTime)} <span class="hint">(${s.durationMin}분)</span></span></div>
     `;
-    $('#ms-edit-member').hidden = true;
+    $('#ms-edit-member').textContent = '일정 편집';
+    $('#ms-edit-member').hidden = false;
+    $('#ms-edit-member').onclick = () => {
+      $('#modal-session').close();
+      openEditPersonal(s);
+    };
   } else {
     const memoLine = m.memo
       ? `<div class="modal-row"><span class="modal-label">메모</span><span class="modal-value">${esc(m.memo)}</span></div>`
@@ -857,12 +887,15 @@ function openSessionModal(sessionId) {
       <div class="modal-row"><span class="modal-label">시간</span><span class="modal-value">${esc(s.startTime)} ~ ${esc(endTime)} <span class="hint">(${s.durationMin}분)</span></span></div>
       ${memoLine}
     `;
+    $('#ms-edit-member').textContent = '회원 편집';
     $('#ms-edit-member').hidden = false;
     $('#ms-edit-member').onclick = () => {
       $('#modal-session').close();
       openMemberModal(m.id);
     };
   }
+
+  $('#ms-delete').textContent = isPersonal ? '일정 삭제' : '수업 삭제';
 
   // Status controls — main row + no-show sub-toggle (차감/면제)
   $('#ms-status-section').hidden = isPersonal;
@@ -992,15 +1025,45 @@ function openMemberDetail(memberId) {
   $('#modal-member-detail').showModal();
 }
 
+const MD_DOW_KR = ['일', '월', '화', '수', '목', '금', '토'];
+const MD_STATUS_LABELS = {
+  scheduled: '예정',
+  completed: '완료',
+  canceled: '취소',
+  noshow_charged: '노쇼·차감',
+  noshow_free: '노쇼·면제',
+};
+
+function mdPeriodRange(anchor, mode) {
+  if (mode === 'week') {
+    const s = startOfWeek(anchor);
+    const e = addDays(s, 6);
+    return { start: ymd(s), end: ymd(e) };
+  }
+  const y = anchor.getFullYear();
+  const mo = String(anchor.getMonth() + 1).padStart(2, '0');
+  const last = new Date(y, anchor.getMonth() + 1, 0);
+  return { start: `${y}-${mo}-01`, end: ymd(last) };
+}
+
+function mdPeriodLabel(anchor, mode) {
+  if (mode === 'week') {
+    const s = startOfWeek(anchor);
+    const e = addDays(s, 6);
+    return `${s.getFullYear()}년 ${s.getMonth() + 1}월 ${s.getDate()}일 ~ ${e.getMonth() + 1}월 ${e.getDate()}일`;
+  }
+  return `${anchor.getFullYear()}년 ${anchor.getMonth() + 1}월`;
+}
+
 function renderMemberDetail() {
   const m = Store.members().find(x => x.id === detailState.memberId);
   if (!m) return;
-  const sessions = Store.sessions().filter(s => s.memberId === m.id);
+  const allSessions = Store.sessions().filter(s => s.memberId === m.id);
 
   $('#md-title').textContent = `${m.name}님 스케줄`;
   $('#md-color').style.background = m.color;
   $('#md-name').textContent = m.name;
-  $('#md-stats').textContent = `등록된 수업 ${sessions.length}건`;
+  $('#md-stats').textContent = `등록된 수업 ${allSessions.length}건`;
   const memoEl = $('#md-memo');
   if (m.memo) {
     memoEl.textContent = m.memo;
@@ -1010,11 +1073,34 @@ function renderMemberDetail() {
     memoEl.classList.add('mc-memo-empty');
   }
 
+  const { start: rangeStart, end: rangeEnd } = mdPeriodRange(detailState.anchor, detailState.mode);
+  $('#md-period').textContent = mdPeriodLabel(detailState.anchor, detailState.mode);
+
+  const filtered = allSessions
+    .filter(s => s.date >= rangeStart && s.date <= rangeEnd)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+
   const cont = $('#md-calendar');
-  const label = detailState.mode === 'week'
-    ? renderWeek(cont, detailState.anchor, sessions, [m], true, { hideMemberName: true })
-    : renderMonth(cont, detailState.anchor, sessions, [m], { hideMemberName: true });
-  $('#md-period').textContent = label;
+  if (!filtered.length) {
+    cont.innerHTML = '<p class="md-empty-hint">이 기간에 수업이 없습니다.</p>';
+    return;
+  }
+
+  const today = ymd(new Date());
+  cont.innerHTML = `<ul class="md-session-list">${filtered.map(s => {
+    const d = new Date(s.date + 'T00:00:00');
+    const dow = MD_DOW_KR[d.getDay()];
+    const endTime = computeEndTime(s.startTime, s.durationMin);
+    const status = s.status || 'scheduled';
+    const isPast = s.date < today;
+    const rowCls = ['md-session-row', `md-s-${status}`, isPast ? 'md-past' : ''].filter(Boolean).join(' ');
+    return `<li class="${rowCls}" data-session-id="${esc(s.id || '')}">
+      <span class="md-row-date">${esc(s.date)} (${dow})</span>
+      <span class="md-row-time">${esc(s.startTime)}~${esc(endTime)}</span>
+      <span class="md-row-dur">${s.durationMin}분</span>
+      <span class="md-row-status md-badge-${status}">${MD_STATUS_LABELS[status] || status}</span>
+    </li>`;
+  }).join('')}</ul>`;
 }
 
 $('#md-prev').addEventListener('click', () => {
