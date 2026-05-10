@@ -569,43 +569,28 @@ textarea.ocr-text {
 
 /* ---------- Color palette ---------- */
 
-/* Color picker: 10휴 칩(5×2 그리드) + 클릭 시 명도 풍선모달 */
-.color-picker {
-  display: block;
-}
+/* Color picker: 10휴 칩 1줄 + 클릭 시 명도 풍선모달 */
+.color-picker { display: block; }
 .color-hue-row {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
+  display: flex; flex-wrap: nowrap; gap: 4px;
 }
 .color-hue {
-  width: 100%; height: 30px;
+  flex: 1; min-width: 0; height: 28px;
   border: 2px solid transparent;
-  border-radius: 7px;
+  border-radius: 6px;
   padding: 0;
   cursor: pointer;
-  position: relative;
   transition: transform 0.08s, border-color 0.1s, box-shadow 0.1s;
   box-shadow: 0 0 0 1px rgba(0,0,0,0.06) inset;
 }
 .color-hue:hover { transform: translateY(-1px); }
-.color-hue.active::after {
-  content: '';
-  position: absolute;
-  top: 5px; right: 5px;
-  width: 7px; height: 7px; border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 0 0 1.5px rgba(0,0,0,0.6);
+.color-hue.active {
+  border-color: var(--text);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.06) inset, 0 2px 8px rgba(0,0,0,0.15);
 }
 .color-hue.open {
   border-color: var(--text);
   box-shadow: 0 0 0 1px rgba(0,0,0,0.06) inset, 0 2px 8px rgba(0,0,0,0.12);
-}
-.color-hue.is-core {
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.4) inset, 0 0 0 2px var(--primary);
-}
-.color-hue.is-core.open {
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.4) inset, 0 0 0 2px var(--primary), 0 2px 8px rgba(0,0,0,0.12);
 }
 
 /* 명도 풍선모달 — position:fixed, body 직접 자식 */
@@ -645,10 +630,12 @@ textarea.ocr-text {
 .color-shade-close:hover { color: var(--text); }
 
 .color-shade-row {
-  display: flex; flex-wrap: nowrap; gap: 4px;
+  display: grid;
+  grid-template-columns: repeat(10, 26px);
+  gap: 4px;
 }
 .color-shade {
-  width: 26px; height: 26px; flex-shrink: 0;
+  width: 26px; height: 26px;
   border: 1.5px solid transparent;
   border-radius: 5px;
   padding: 0;
@@ -661,7 +648,7 @@ textarea.ocr-text {
   border-color: var(--text);
   box-shadow: 0 0 0 2px #fff inset, 0 0 0 1px var(--text);
 }
-.color-shade.no-aa { opacity: 0.4; }
+.color-shade.no-aa { opacity: 0.35; }
 
 /* ---------- Member list (vertical rows) ---------- */
 .member-filters {
@@ -837,48 +824,57 @@ textarea.ocr-text {
 }
 
 /* ---------- Session status: past / completed / canceled ---------- */
+
+/* past: 톤다운. 다른 상태 클래스가 opacity를 올리지 않도록 모두 아래에 배치 */
 .wg-event.is-past, .month-grid .ev.is-past { opacity: 0.55; }
-.wg-event.is-completed, .month-grid .ev.is-completed { opacity: 1; }
+
+/* completed: 체크 뱃지만. opacity는 건드리지 않아서 past+completed = 0.55 + ✓ 중복 표기 */
 .wg-event.is-completed::after,
 .month-grid .ev.is-completed::after {
   content: '✓';
-  position: absolute; top: 2px; right: 4px;
-  font-size: 11px; font-weight: 800;
-  color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  position: absolute; top: 1px; right: 3px;
+  font-size: 12px; font-weight: 900; line-height: 1;
+  color: rgba(255,255,255,0.95);
+  text-shadow: 0 0 3px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.4);
   pointer-events: none;
 }
 .month-grid .ev { position: relative; }
 .month-grid .ev.is-completed { padding-right: 16px; }
+
+/* canceled: 빗금 + 취소선. opacity 낮춤(단독), past와 겹치면 past가 이 규칙보다 나중이므로 0.55로 고정 */
 .wg-event.is-canceled, .month-grid .ev.is-canceled {
-  opacity: 0.5;
   text-decoration: line-through;
   background-image: repeating-linear-gradient(
     -45deg,
     rgba(0,0,0,0) 0, rgba(0,0,0,0) 4px,
-    rgba(0,0,0,0.18) 4px, rgba(0,0,0,0.18) 5px
+    rgba(0,0,0,0.22) 4px, rgba(0,0,0,0.22) 5px
   ) !important;
 }
-/* No-show: warn-color outline + ! badge. Two variants share visual base. */
+
+/* noshow: 경고 윤곽선 + ! 뱃지 */
 .wg-event.is-noshow-charged, .wg-event.is-noshow-free,
 .month-grid .ev.is-noshow-charged, .month-grid .ev.is-noshow-free {
-  opacity: 0.85;
   box-shadow: inset 0 0 0 2px var(--warn);
 }
 .wg-event.is-noshow-charged::after, .wg-event.is-noshow-free::after,
 .month-grid .ev.is-noshow-charged::after, .month-grid .ev.is-noshow-free::after {
   content: '!';
   position: absolute; top: 1px; right: 4px;
-  font-size: 12px; font-weight: 900;
-  color: var(--warn); text-shadow: 0 1px 1px rgba(0,0,0,0.25);
+  font-size: 12px; font-weight: 900; line-height: 1;
+  color: rgba(255,220,0,0.95);
+  text-shadow: 0 0 3px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.4);
   pointer-events: none;
 }
-/* Free (no-deduction) variant: dotted underline accent to differentiate */
 .wg-event.is-noshow-free, .month-grid .ev.is-noshow-free {
   text-decoration: underline dotted rgba(255,255,255,0.7);
   text-underline-offset: 2px;
 }
 .month-grid .ev.is-noshow-charged,
 .month-grid .ev.is-noshow-free { padding-right: 16px; }
+
+/* past + 상태 조합: past(0.55)가 항상 적용되도록 명시적 선언 */
+.wg-event.is-past.is-noshow-charged, .wg-event.is-past.is-noshow-free,
+.month-grid .ev.is-past.is-noshow-charged, .month-grid .ev.is-past.is-noshow-free { opacity: 0.55; }
 
 /* Session status buttons in modal */
 .ms-status-section {
