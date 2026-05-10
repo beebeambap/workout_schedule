@@ -1,4 +1,9 @@
-// HSL ↔ hex converters
+// 레슨핏 컬러 시스템
+// - 코어: #0d9488 (deep teal, 시그니처)
+// - 휴 10개: 코어를 시작점으로 색상환 36° 등간격
+// - 채도 통일(S=84%) + 휴별 베이스 L 자동 보정으로 흰 텍스트 WCAG AA 통과
+// - 셰이드 10단계: 휴별 베이스 L 기준 -20%~+26% 오프셋
+
 function hslToHex(h, s, l) {
   s /= 100; l /= 100;
   const a = s * Math.min(l, 1 - l);
@@ -10,94 +15,112 @@ function hslToHex(h, s, l) {
   return `#${f(0)}${f(8)}${f(4)}`;
 }
 
-function hexToHsl(hex) {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-  if (max === min) return [0, 0, Math.round(l * 100)];
-  const d = max - min;
-  const s = d / (l > 0.5 ? 2 - max - min : max + min);
-  let h;
-  if (max === r)      h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
-  else if (max === g) h = ((b - r) / d + 2) / 6;
-  else                h = ((r - g) / d + 4) / 6;
-  return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
-}
-
 function wcagContrast(hex) {
   const lin = v => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
   const lum = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-  return (1 + 0.05) / (lum + 0.05); // contrast with white background
+  return (1 + 0.05) / (lum + 0.05);
 }
 
-// 10 base hues — kept exact for backward-compat with migration checks.
-const BASE = [
-  { hex: '#e11d48', name: '산호' },
-  { hex: '#ea580c', name: '귤' },
-  { hex: '#a16207', name: '머스터드' },
-  { hex: '#15803d', name: '숲' },
-  { hex: '#0d9488', name: '민트' },
-  { hex: '#0284c7', name: '하늘' },
-  { hex: '#4f46e5', name: '청보라' },
-  { hex: '#7c3aed', name: '라벤더' },
-  { hex: '#c026d3', name: '자두' },
-  { hex: '#475569', name: '그라파이트' },
+export const BRAND_CORE = '#0d9488';
+const CORE_S = 84;
+const CORE_L = 32;
+
+// 코어(177°)를 시작점으로 색상환 36° 등간격. 결과: [177, 213, 249, 285, 321, 357, 33, 69, 105, 141]
+const HUE_DEFS = [
+  { h: 177, name: '틸', isCore: true },
+  { h: 213, name: '하늘' },
+  { h: 249, name: '청보라' },
+  { h: 285, name: '라벤더' },
+  { h: 321, name: '자두' },
+  { h: 357, name: '산호' },
+  { h: 33,  name: '귤' },
+  { h: 69,  name: '라임' },
+  { h: 105, name: '새싹' },
+  { h: 141, name: '숲' },
 ];
 
-// 10 lightness steps, darkest→lightest.
-// L=55,60 covers 청보라(L≈59)/라벤더(L≈58) which pass AA due to high blue luminance.
-const SHADE_L = [22, 26, 30, 34, 38, 42, 46, 50, 55, 60];
+// 베이스 셰이드 기준 오프셋. 인덱스 5(=offset 0)가 베이스 = 휴 칩에 표시되는 색.
+const SHADE_OFFSETS = [-20, -16, -12, -8, -4, 0, 5, 11, 18, 26];
+const BASE_SHADE_INDEX = 5;
 
-// 10 hue × 10 shade = 100 color slots.
-// Each base hex is placed at its closest shade index so the exact color appears in the grid.
-export const COLOR_SLOTS = BASE.flatMap((base, hi) => {
-  const [h, s, lBase] = hexToHsl(base.hex);
-  const closestIdx = SHADE_L.reduce(
-    (best, l, i) => Math.abs(l - lBase) < Math.abs(SHADE_L[best] - lBase) ? i : best, 0
-  );
-  return SHADE_L.map((l, si) => {
-    const hex = si === closestIdx ? base.hex : hslToHex(h, s, l);
-    const contrast = wcagContrast(hex);
-    return { hueIndex: hi, shadeIndex: si, hex, name: `${base.name} ${si + 1}`, hueName: base.name, aa: contrast >= 4.5, baseShadeIndex: closestIdx };
+// AA 통과(흰 텍스트 contrast≥4.5)하는 가장 밝은 L을 lMax 이하에서 탐색.
+function findAaBaseL(h, s, lMax) {
+  for (let l = lMax; l >= 12; l--) {
+    if (wcagContrast(hslToHex(h, s, l)) >= 4.5) return l;
+  }
+  return 12;
+}
+
+export const COLOR_HUES = HUE_DEFS.map((hue, hi) => {
+  // 모든 휴 베이스 L을 AA-safe 최대 밝기로 자동 보정. 코어도 동일.
+  // 결과: 모든 베이스 셰이드(shade 5)가 흰 텍스트 contrast≥4.5 보장.
+  const baseL = findAaBaseL(hue.h, CORE_S, CORE_L);
+  const baseHex = hslToHex(hue.h, CORE_S, baseL);
+  const shades = SHADE_OFFSETS.map((off, si) => {
+    const l = Math.max(5, Math.min(85, baseL + off));
+    const hex = hslToHex(hue.h, CORE_S, l);
+    return { hueIndex: hi, shadeIndex: si, hex, l, aa: wcagContrast(hex) >= 4.5 };
   });
+  return { hueIndex: hi, h: hue.h, name: hue.name, isCore: !!hue.isCore, baseL, baseHex, shades };
 });
 
-// Original 10 base colors — unchanged for backward-compat with migration checks.
-export const COLOR_PALETTE = BASE.map(b => ({ hex: b.hex, name: b.name }));
-export const COLOR_DEFAULT = '#0284c7';
+// 100-슬롯 평탄화 (이름 부착)
+export const COLOR_SLOTS = COLOR_HUES.flatMap(hd =>
+  hd.shades.map(s => ({ ...s, name: `${hd.name} ${s.shadeIndex + 1}`, hueName: hd.name }))
+);
 
-// Lookup: any known hex → hueIndex (covers both base and computed slot colors).
+// 호환성: 기존 코드가 참조하는 10-색 베이스 팔레트
+export const COLOR_PALETTE = COLOR_HUES.map(hd => ({ hex: hd.baseHex, name: hd.name }));
+export const COLOR_DEFAULT = BRAND_CORE;
+
+// hex → hueIndex 룩업 (베이스 + 모든 셰이드)
 const HEX_TO_HUE = new Map();
-BASE.forEach((b, i) => HEX_TO_HUE.set(b.hex.toLowerCase(), i));
-COLOR_SLOTS.forEach(s => HEX_TO_HUE.set(s.hex.toLowerCase(), s.hueIndex));
+COLOR_HUES.forEach(hd => {
+  HEX_TO_HUE.set(hd.baseHex.toLowerCase(), hd.hueIndex);
+  hd.shades.forEach(s => HEX_TO_HUE.set(s.hex.toLowerCase(), hd.hueIndex));
+});
 
-// 2-level round-robin: least-used hue → within that hue, least-used AA shade.
+// 2단계 라운드로빈: 최소 사용 휴 → 해당 휴의 최소 사용 AA 셰이드 → 동률 시 베이스 셰이드 우선
 export function pickNextColor(members) {
   const aaSlots = COLOR_SLOTS.filter(s => s.aa);
   const arr = members || [];
-
-  const hueCounts = Array(10).fill(0);
+  const hueCounts = Array(COLOR_HUES.length).fill(0);
   const slotCounts = new Map(aaSlots.map(s => [s.hex, 0]));
   for (const m of arr) {
-    const hi = m.color ? HEX_TO_HUE.get(m.color.toLowerCase()) : undefined;
+    if (!m || !m.color) continue;
+    const lo = m.color.toLowerCase();
+    const hi = HEX_TO_HUE.get(lo);
     if (hi !== undefined) hueCounts[hi]++;
-    if (m.color && slotCounts.has(m.color)) slotCounts.set(m.color, slotCounts.get(m.color) + 1);
+    if (slotCounts.has(m.color)) slotCounts.set(m.color, slotCounts.get(m.color) + 1);
   }
-
   const minHue = Math.min(...hueCounts);
   const bestHue = hueCounts.indexOf(minHue);
-
   const hueSlots = aaSlots.filter(s => s.hueIndex === bestHue);
-  const baseShadeIdx = hueSlots[0]?.baseShadeIndex ?? 5;
-  // Ties broken by proximity to base shade so the original color is assigned first.
   return hueSlots.sort((a, b) => {
     const ca = slotCounts.get(a.hex) ?? 0, cb = slotCounts.get(b.hex) ?? 0;
     if (ca !== cb) return ca - cb;
-    return Math.abs(a.shadeIndex - baseShadeIdx) - Math.abs(b.shadeIndex - baseShadeIdx);
+    return Math.abs(a.shadeIndex - BASE_SHADE_INDEX) - Math.abs(b.shadeIndex - BASE_SHADE_INDEX);
   })[0].hex;
+}
+
+// 임의 hex → 새 팔레트의 가장 가까운 슬롯 색 (RGB 거리 기준). 마이그레이션용.
+export function nearestSlotColor(hex) {
+  if (!hex || hex.length !== 7) return COLOR_DEFAULT;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return COLOR_DEFAULT;
+  let best = COLOR_DEFAULT;
+  let bestDist = Infinity;
+  for (const slot of COLOR_SLOTS) {
+    const tr = parseInt(slot.hex.slice(1, 3), 16);
+    const tg = parseInt(slot.hex.slice(3, 5), 16);
+    const tb = parseInt(slot.hex.slice(5, 7), 16);
+    const d = (tr - r) ** 2 + (tg - g) ** 2 + (tb - b) ** 2;
+    if (d < bestDist) { bestDist = d; best = slot.hex; }
+  }
+  return best;
 }
