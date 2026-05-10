@@ -113,11 +113,13 @@ export function renderWeek(container, anchor, sessions, members, fitToSessions =
   html += `<div class="wg-header">`;
   html += `<div class="wg-corner"></div>`;
   for (const d of days) {
-    const isToday = ymd(d) === today ? ' today' : '';
+    const dStr = ymd(d);
+    const isToday = dStr === today ? ' today' : '';
+    const isPast = dStr < today ? ' is-past-day' : '';
     const dc = dayClass(d);
-    const holiday = lookupHoliday(ymd(d));
+    const holiday = lookupHoliday(dStr);
     const sub = holiday ? `<span class="wg-holiday-name">${escapeHtml(holiday)}</span>` : '';
-    html += `<div class="wg-day-head${isToday} ${dc}">${d.getMonth() + 1}/${d.getDate()} (${DOW_KR[d.getDay()]})${sub}</div>`;
+    html += `<div class="wg-day-head${isToday}${isPast} ${dc}">${d.getMonth() + 1}/${d.getDate()} (${DOW_KR[d.getDay()]})${sub}</div>`;
   }
   html += `</div>`;
 
@@ -134,7 +136,7 @@ export function renderWeek(container, anchor, sessions, members, fitToSessions =
   // Day columns
   for (const d of days) {
     const dStr = ymd(d);
-    html += `<div class="wg-day-col" data-date="${dStr}">`;
+    html += `<div class="wg-day-col${dStr < today ? ' is-past-day' : ''}" data-date="${dStr}">`;
 
     // Hour grid lines (between hours) + optional thicker AM/PM line at 12
     for (let h = hStart + 1; h < hEnd; h++) {
@@ -247,6 +249,7 @@ export function renderMonth(container, anchor, sessions, members, opts = {}) {
     cls += ' ' + dayClass(d);
     const holiday = lookupHoliday(dStr);
     const isPastDay = dStr < today;
+    if (isPastDay) cls += ' is-past-day';
     const evs = sessions
       .filter(s => s.date === dStr)
       .sort((a, b) => a.startTime.localeCompare(b.startTime))
